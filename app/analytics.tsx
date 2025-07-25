@@ -1,0 +1,511 @@
+import { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Platform, Dimensions } from "react-native";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { getOrders, getProducts, getExecutives } from "./api";
+import { Ionicons } from '@expo/vector-icons';
+import { LineChart } from "react-native-chart-kit";
+
+const ACCENT = "#3D5AFE";
+const screenWidth = Dimensions.get("window").width;
+
+interface Analytics {
+  totalOrders: number;
+  totalInventory: number;
+  totalSales: number;
+  avgOrderValue: number;
+}
+
+interface TopProduct {
+  name: string;
+  totalSold: number;
+  totalRevenue: number;
+}
+
+interface ExecutiveAnalytics {
+  executiveSales: number;
+  executiveOrders: number;
+  salesShare: number;
+  topExecProducts: TopProduct[];
+}
+
+export default function AnalyticsScreen() {
+  const router = useRouter();
+  const { role } = useLocalSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<Analytics>({
+    totalOrders: 0,
+    totalInventory: 0,
+    totalSales: 0,
+    avgOrderValue: 0
+  });
+  const [salesOverTime, setSalesOverTime] = useState<{ labels: string[]; data: number[] }>({ labels: [], data: [] });
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [execAnalytics, setExecAnalytics] = useState<ExecutiveAnalytics>({
+    executiveSales: 0,
+    executiveOrders: 0,
+    salesShare: 0,
+    topExecProducts: []
+  });
+  const [selectedTab, setSelectedTab] = useState<'general' | 'executive'>('general');
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    try {
+      // Fetch orders, products, and executives in parallel
+      const [ordersResponse, productsResponse, executives] = await Promise.all([
+        getOrders(),
+        getProducts(),
+        getExecutives()
+      ]);
+
+      const orders = ordersResponse.data;
+      const products = productsResponse.data;
+      // executives is already filtered to role === 'Executive'
+
+      // Calculate metrics
+      const totalOrders = orders.length;
+      const totalInventory = products.length;
+      // Calculate total sales and average order value
+      const totalSales = orders.reduce((sum: number, order: any) => {
+        const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
+        return sum + orderTotal;
+      }, 0);
+      const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+      // --- Sales Over Time (by month) ---
+      const salesByMonth: { [key: string]: number } = {};
+      orders.forEach((order: any) => {
+        const date = new Date(order.date);
+        const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // e.g. 2024-06
+        const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
+        salesByMonth[label] = (salesByMonth[label] || 0) + orderTotal;
+      });
+      const sortedMonths = Object.keys(salesByMonth).sort();
+      const salesOverTimeData = {
+        labels: sortedMonths,
+        data: sortedMonths.map(month => salesByMonth[month])
+      };
+
+      // --- Top Selling Products ---
+      const productSales: { [name: string]: { totalSold: number; totalRevenue: number } } = {};
+      orders.forEach((order: any) => {
+        order.orderItems.forEach((item: any) => {
+          if (!productSales[item.name]) {
+            productSales[item.name] = { totalSold: 0, totalRevenue: 0 };
+          }
+          productSales[item.name].totalSold += item.qty;
+          productSales[item.name].totalRevenue += item.total;
+        });
+      });
+      const topProductsArr: TopProduct[] = Object.entries(productSales)
+        .map(([name, stats]) => ({ name, ...stats }))
+        .sort((a, b) => b.totalSold - a.totalSold)
+        .slice(0, 5); // Top 5
+
+      // Executive Analytics
+      const executiveNames = executives.map((e: any) => e.name);
+      const execOrders = orders.filter((order: any) => executiveNames.includes(order.createdBy));
+      const executiveOrders = execOrders.length;
+      const executiveSales = execOrders.reduce((sum: number, order: any) => {
+        const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
+        return sum + orderTotal;
+      }, 0);
+      const salesShare = totalSales > 0 ? (executiveSales / totalSales) * 100 : 0;
+      // Top products by executive
+      const execProductSales: { [name: string]: { totalSold: number; totalRevenue: number } } = {};
+      execOrders.forEach((order: any) => {
+        order.orderItems.forEach((item: any) => {
+          if (!execProductSales[item.name]) {
+            execProductSales[item.name] = { totalSold: 0, totalRevenue: 0 };
+          }
+          execProductSales[item.name].totalSold += item.qty;
+          execProductSales[item.name].totalRevenue += item.total;
+        });
+      });
+      const topExecProducts: TopProduct[] = Object.entries(execProductSales)
+        .map(([name, stats]) => ({ name, ...stats }))
+        .sort((a, b) => b.totalSold - a.totalSold)
+        .slice(0, 5);
+
+      setAnalytics({
+        totalOrders,
+        totalInventory,
+        totalSales,
+        avgOrderValue
+      });
+      setSalesOverTime(salesOverTimeData);
+      setTopProducts(topProductsArr);
+      setExecAnalytics({
+        executiveSales,
+        executiveOrders,
+        salesShare,
+        topExecProducts
+      });
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return `₹${amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.headerBar}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={ACCENT} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Analytics</Text>
+        <Pressable style={styles.refreshBtn} onPress={fetchAnalytics}>
+          <Ionicons name="refresh" size={22} color={ACCENT} />
+        </Pressable>
+      </View>
+
+      {/* Tab Switcher */}
+      <View style={styles.tabBar}>
+        <Pressable
+          style={[styles.tabBtn, selectedTab === 'general' && styles.tabBtnActive]}
+          onPress={() => setSelectedTab('general')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'general' && styles.tabTextActive]}>General Analytics</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabBtn, selectedTab === 'executive' && styles.tabBtnActive]}
+          onPress={() => setSelectedTab('executive')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'executive' && styles.tabTextActive]}>Executive Analytics</Text>
+        </Pressable>
+      </View>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={ACCENT} />
+        </View>
+      ) : (
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {selectedTab === 'general' ? (
+            <>
+              {/* Metrics Grid */}
+              <View style={styles.metricsGrid}>
+                {/* Total Orders */}
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#e3f2fd' }]}>
+                    <Ionicons name="cube" size={24} color="#1976d2" />
+                  </View>
+                  <Text style={styles.metricValue}>{analytics.totalOrders}</Text>
+                  <Text style={styles.metricLabel}>Total Orders</Text>
+                </View>
+
+                {/* Total Inventory */}
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#e8f5e9' }]}>
+                    <Ionicons name="file-tray-stacked" size={24} color="#2e7d32" />
+                  </View>
+                  <Text style={styles.metricValue}>{analytics.totalInventory}</Text>
+                  <Text style={styles.metricLabel}>Total Inventory</Text>
+                </View>
+
+                {/* Total Sales */}
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#f3e5f5' }]}>
+                    <Ionicons name="cash" size={24} color="#7b1fa2" />
+                  </View>
+                  <Text style={styles.metricValue}>{formatCurrency(analytics.totalSales)}</Text>
+                  <Text style={styles.metricLabel}>Total Sales</Text>
+                </View>
+
+                {/* Average Order Value */}
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#fff3e0' }]}>
+                    <Ionicons name="trending-up" size={24} color="#f57c00" />
+                  </View>
+                  <Text style={styles.metricValue}>{formatCurrency(analytics.avgOrderValue)}</Text>
+                  <Text style={styles.metricLabel}>Avg. Order Value</Text>
+                </View>
+              </View>
+
+              {/* Sales Over Time Chart */}
+              <Text style={styles.sectionTitle}>Sales Over Time</Text>
+              {salesOverTime.labels.length > 0 ? (
+                <LineChart
+                  data={{
+                    labels: salesOverTime.labels,
+                    datasets: [
+                      { data: salesOverTime.data }
+                    ]
+                  }}
+                  width={screenWidth - 32}
+                  height={220}
+                  yAxisLabel="₹"
+                  chartConfig={{
+                    backgroundColor: '#fff',
+                    backgroundGradientFrom: '#fff',
+                    backgroundGradientTo: '#fff',
+                    decimalPlaces: 0,
+                    color: (opacity = 1) => `rgba(61, 90, 254, ${opacity})`,
+                    labelColor: (opacity = 1) => `rgba(34, 34, 59, ${opacity})`,
+                    style: { borderRadius: 16 },
+                    propsForDots: {
+                      r: "5",
+                      strokeWidth: "2",
+                      stroke: ACCENT
+                    }
+                  }}
+                  bezier
+                  style={{ marginVertical: 12, borderRadius: 16 }}
+                />
+              ) : (
+                <Text style={styles.noDataText}>No sales data available.</Text>
+              )}
+
+              {/* Top Selling Products */}
+              <Text style={styles.sectionTitle}>Top Selling Products</Text>
+              {topProducts.length > 0 ? (
+                <View style={styles.topProductsList}>
+                  {topProducts.map((prod, idx) => (
+                    <View key={prod.name} style={styles.topProductRow}>
+                      <Text style={styles.topProductRank}>{idx + 1}.</Text>
+                      <Text style={styles.topProductName}>{prod.name}</Text>
+                      <Text style={styles.topProductQty}>Qty: {prod.totalSold}</Text>
+                      <Text style={styles.topProductRevenue}>{formatCurrency(prod.totalRevenue)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.noDataText}>No product sales data available.</Text>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Executive Analytics Section */}
+              <View style={styles.metricsGrid}>
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#e3f2fd' }]}> 
+                    <Ionicons name="person" size={24} color="#1976d2" />
+                  </View>
+                  <Text style={styles.metricValue}>{formatCurrency(execAnalytics.executiveSales)}</Text>
+                  <Text style={styles.metricLabel}>Executive Sales</Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#fff3e0' }]}> 
+                    <Ionicons name="document-text" size={24} color="#f57c00" />
+                  </View>
+                  <Text style={styles.metricValue}>{execAnalytics.executiveOrders}</Text>
+                  <Text style={styles.metricLabel}>Executive Orders</Text>
+                </View>
+                <View style={styles.metricCard}>
+                  <View style={[styles.iconCircle, { backgroundColor: '#f3e5f5' }]}> 
+                    <Ionicons name="pie-chart" size={24} color="#7b1fa2" />
+                  </View>
+                  <Text style={styles.metricValue}>{execAnalytics.salesShare.toFixed(1)}%</Text>
+                  <Text style={styles.metricLabel}>Sales Share</Text>
+                </View>
+              </View>
+              <Text style={styles.sectionTitle}>Most Sold Products By Executive</Text>
+              {execAnalytics.topExecProducts.length > 0 ? (
+                <View style={styles.topProductsList}>
+                  {execAnalytics.topExecProducts.map((prod, idx) => (
+                    <View key={prod.name} style={styles.topProductRow}>
+                      <Text style={styles.topProductRank}>{idx + 1}.</Text>
+                      <Text style={styles.topProductName}>{prod.name}</Text>
+                      <Text style={styles.topProductQty}>Qty: {prod.totalSold}</Text>
+                      <Text style={styles.topProductRevenue}>{formatCurrency(prod.totalRevenue)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.noDataText}>No executive product sales data available.</Text>
+              )}
+            </>
+          )}
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f7fa',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e3e9f9',
+    elevation: 4,
+    zIndex: 10,
+    minHeight: 68,
+  },
+  backBtn: {
+    backgroundColor: '#e3e9f9',
+    borderRadius: 18,
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#22223b',
+    letterSpacing: 0.2,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+  },
+  refreshBtn: {
+    backgroundColor: '#e3e9f9',
+    borderRadius: 18,
+    padding: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  metricCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '47%', // Slightly less than half to account for gap
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 4,
+  },
+  iconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  metricValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#22223b',
+    marginBottom: 4,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+  },
+  metricLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+    textAlign: 'center',
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: ACCENT,
+    marginTop: 24,
+    marginBottom: 10,
+    letterSpacing: 0.2,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+  },
+  noDataText: {
+    color: '#b0b3b8',
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  topProductsList: {
+    marginBottom: 24,
+  },
+  topProductRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  topProductRank: {
+    fontWeight: '700',
+    color: ACCENT,
+    fontSize: 16,
+    marginRight: 10,
+  },
+  topProductName: {
+    flex: 1,
+    fontSize: 15,
+    color: '#22223b',
+    fontWeight: '600',
+  },
+  topProductQty: {
+    fontSize: 14,
+    color: '#666',
+    marginRight: 12,
+  },
+  topProductRevenue: {
+    fontSize: 14,
+    color: '#388e3c',
+    fontWeight: '700',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f6fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e3e9f9',
+    marginBottom: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabBtnActive: {
+    borderBottomColor: ACCENT,
+    backgroundColor: '#fff',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#888',
+    fontWeight: '600',
+    letterSpacing: 0.2,
+  },
+  tabTextActive: {
+    color: ACCENT,
+  },
+}); 

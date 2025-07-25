@@ -1,0 +1,487 @@
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView } from "react-native";
+import { getProducts } from "../api";
+import { Ionicons } from '@expo/vector-icons';
+import { useOrder } from "./OrderContext";
+
+const ACCENT = "#3D5AFE";
+
+export default function OrderItemsScreen() {
+  const router = useRouter();
+  const { orderItems, setAllOrderItems, removeOrderItem } = useOrder();
+  const [productSearch, setProductSearch] = useState("");
+  const [productResults, setProductResults] = useState<any[]>([]);
+  const [productLoading, setProductLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [qty, setQty] = useState("");
+  const [price, setPrice] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [searchDisabled, setSearchDisabled] = useState(false);
+  const params = useLocalSearchParams();
+
+  // If coming back from new-product, auto-search and select
+  useEffect(() => {
+    if (params.productName) {
+      const fetchProduct = async () => {
+        try {
+          const response = await getProducts();
+          const found = response.data.find((p: any) => p.name.toLowerCase() === String(params.productName).toLowerCase());
+          if (found) {
+            setSelectedProduct(found);
+            setSearchDisabled(true);
+            setProductSearch("");
+            setProductResults([]);
+          }
+        } catch (err) {
+          Alert.alert("Error", "Failed to fetch product");
+        }
+      };
+      fetchProduct();
+    }
+  }, [params.productName]);
+
+  // Fetch products for search
+  const fetchAndSetProducts = async (search: string) => {
+    setProductLoading(true);
+    try {
+      const response = await getProducts();
+      let products = response.data;
+      if (search.trim()) {
+        products = products.filter((p: any) =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          (p.dimension && p.dimension.toLowerCase().includes(search.toLowerCase()))
+        );
+      } else {
+        products = [];
+      }
+      setProductResults(products);
+    } catch (err) {
+      Alert.alert("Error", "Failed to fetch products");
+      setProductResults([]);
+    }
+    setProductLoading(false);
+  };
+
+  // Handle product search
+  const handleProductSearch = (text: string) => {
+    setProductSearch(text);
+    fetchAndSetProducts(text);
+    setSelectedProduct(null);
+    setQty("");
+    setPrice("");
+  };
+
+  // Add product to order items
+  const handleAddProduct = () => {
+    if (!selectedProduct || !qty || !price) {
+      alert("Select a product, enter QTY and Price.");
+      return;
+    }
+    setAllOrderItems([
+      ...orderItems,
+      {
+        productId: selectedProduct._id,
+        name: selectedProduct.name,
+        dimension: selectedProduct.dimension,
+        qty: Number(qty),
+        price: Number(price),
+        total: Number(qty) * Number(price),
+      },
+    ]);
+    setSelectedProduct(null);
+    setQty("");
+    setPrice("");
+    setSearchDisabled(false); // Re-enable search after adding
+    setProductSearch("");
+    setProductResults([]);
+  };
+
+  // Remove product from order items
+  const handleRemoveOrderItem = (idx: number) => {
+    removeOrderItem(idx);
+  };
+
+  // When a product is selected, clear the search bar, results, and disable search
+  const handleSelectProduct = (item: any) => {
+    setSelectedProduct(item);
+    setProductSearch("");
+    setProductResults([]);
+    setSearchDisabled(true);
+  };
+
+  // Total order amount
+  const orderTotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
+
+  // Return items to previous screen
+  const handleReturn = () => {
+    router.back();
+  };
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={styles.screenWrap}>
+        <View style={styles.headerBar}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color={ACCENT} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Add Order Items</Text>
+        </View>
+        <ScrollView contentContainerStyle={styles.container}>
+          {/* Search/Add Product */}
+          <Text style={styles.floatingLabel}>Search Product</Text>
+          <TextInput
+            style={[
+              styles.input,
+              styles.productSearchInput,
+              searchFocused && styles.productSearchInputFocused
+            ]}
+            placeholder="Search products by name or dimension"
+            value={productSearch}
+            onChangeText={handleProductSearch}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            autoFocus
+            editable={!searchDisabled}
+          />
+          {!selectedProduct && productSearch.trim().length > 0 && productResults.length === 0 && (
+            <View style={{ alignItems: 'center', marginTop: 24 }}>
+              <Text style={{ color: '#b0b3b8', marginBottom: 12 }}>No products found.</Text>
+              <Pressable style={styles.createProductBtn} onPress={() => router.push({ pathname: '/products/new-product', params: { returnTo: 'orderitems', productName: productSearch } })}>
+                <Text style={styles.createProductBtnText}>Create Product</Text>
+              </Pressable>
+            </View>
+          )}
+          {!selectedProduct && productSearch.trim().length > 0 && productResults.length > 0 && (
+            <View style={{ maxHeight: 180, marginBottom: 12, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden' }}>
+              {productResults.map((item: any) => (
+                <Pressable
+                  key={item._id}
+                  style={({ pressed }) => [styles.productResultRow, selectedProduct && selectedProduct._id === item._id && styles.productResultRowSelected, pressed && { opacity: 0.7 }]}
+                  onPress={() => handleSelectProduct(item)}
+                >
+                  <Text style={styles.productResultName}>{item.name}</Text>
+                  <Text style={styles.productResultDim}>{item.dimension}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          {selectedProduct && (
+            <View style={styles.selectedProductFormWrap}>
+              <Text style={styles.floatingLabel}>Product</Text>
+              <View style={styles.selectedProductNameBox}>
+                <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
+              </View>
+              <View style={styles.formFieldSpacing} />
+              <Text style={styles.floatingLabel}>QTY</Text>
+              <TextInput
+                style={styles.input}
+                value={qty}
+                onChangeText={setQty}
+                keyboardType="numeric"
+                placeholder="Enter quantity"
+                placeholderTextColor="#b0b3b8"
+              />
+              <View style={styles.formFieldSpacing} />
+              <Text style={styles.floatingLabel}>Price</Text>
+              <TextInput
+                style={styles.input}
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+                placeholder="Enter price"
+                placeholderTextColor="#b0b3b8"
+              />
+              <View style={styles.formFieldSpacing} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
+                <Text style={{ fontWeight: '600', color: ACCENT, fontSize: 15 }}>Total: {qty && price ? Number(qty) * Number(price) : 0}</Text>
+              </View>
+              <Pressable style={styles.addProductBtn} onPress={handleAddProduct}>
+                <Ionicons name="add-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
+                <Text style={styles.addProductBtnText}>Add to Order</Text>
+              </Pressable>
+              <Pressable style={[styles.addProductBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e53935', marginTop: 8 }]} onPress={() => { setSelectedProduct(null); setQty(""); setPrice(""); setSearchDisabled(false); }}>
+                <Ionicons name="close-circle-outline" size={20} color="#e53935" style={{ marginRight: 6 }} />
+                <Text style={[styles.addProductBtnText, { color: '#e53935' }]}>Cancel</Text>
+              </Pressable>
+            </View>
+          )}
+          {/* List of Order Items */}
+          {orderItems.length > 0 && (
+            <View style={{ marginBottom: 18 }}>
+              {orderItems.map((item: any, idx: number) => (
+                <View key={idx} style={styles.orderItemCard}>
+                  <View style={styles.orderItemCardTopRow}>
+                    <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                    <Pressable style={styles.removeOrderItemBtn} onPress={() => handleRemoveOrderItem(idx)}>
+                      <Ionicons name="close-circle" size={20} color="#e53935" />
+                    </Pressable>
+                  </View>
+                  <View style={styles.orderItemCardMidRow}>
+                    <Text style={styles.orderItemMeta}>Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text></Text>
+                    <Text style={styles.orderItemMeta}>| Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text></Text>
+                  </View>
+                  <View style={styles.orderItemCardBotRow}>
+                    <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
+                  </View>
+                </View>
+              ))}
+              <View style={styles.orderItemsFooterCard}>
+                <Text style={styles.orderItemsFooterTotalLabel}>Total</Text>
+                <Text style={styles.orderItemsFooterTotalValue}>₹{orderTotal}</Text>
+              </View>
+            </View>
+          )}
+          {orderItems.length > 0 && (
+            <Pressable style={styles.addProductBtn} onPress={handleReturn}>
+              <Ionicons name="checkmark-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
+              <Text style={styles.addProductBtnText}>Done</Text>
+            </Pressable>
+          )}
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  screenWrap: {
+    flex: 1,
+    backgroundColor: '#f5f7fa',
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingTop: Platform.OS === 'ios' ? 48 : 24,
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e3e9f9',
+    elevation: 4,
+    zIndex: 10,
+    minHeight: 68,
+  },
+  backBtn: {
+    backgroundColor: '#e3e9f9',
+    borderRadius: 18,
+    padding: 8,
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#22223b',
+    letterSpacing: 0.2,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+  },
+  container: {
+    paddingVertical: 32,
+    paddingHorizontal: 18,
+    minHeight: 400,
+    flexGrow: 1,
+  },
+  floatingLabel: {
+    fontSize: 13,
+    color: '#b0b3b8',
+    marginBottom: 8,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+  },
+  input: {
+    width: '100%',
+    borderWidth: 0,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#f3f6fa',
+    color: '#222',
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
+    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
+  },
+  productSearchInput: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 8,
+  },
+  productSearchInputFocused: {
+    borderBottomColor: ACCENT,
+  },
+  productResultRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  productResultRowSelected: {
+    backgroundColor: '#f3f6fa',
+  },
+  productResultName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#22223b',
+  },
+  productResultDim: {
+    fontSize: 13,
+    color: '#b0b3b8',
+    marginTop: 2,
+  },
+  createProductBtn: {
+    backgroundColor: ACCENT,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  createProductBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  orderItemsTable: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  orderItemsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  orderItemsCol: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#22223b',
+    flex: 1,
+  },
+  orderItemsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  orderItemsFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  removeOrderItemBtn: {
+    padding: 5,
+  },
+  addProductBtn: {
+    backgroundColor: ACCENT,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  addProductBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15,
+    marginLeft: 8,
+  },
+  orderItemCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 18,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  orderItemCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderItemName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#22223b',
+    flex: 1,
+    marginRight: 10,
+  },
+  orderItemCardMidRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  orderItemMeta: {
+    fontSize: 14,
+    color: '#b0b3b8',
+  },
+  orderItemMetaValue: {
+    fontWeight: '600',
+    color: '#22223b',
+  },
+  orderItemCardBotRow: {
+    marginTop: 8,
+  },
+  orderItemTotal: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ACCENT,
+  },
+  orderItemsFooterCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  orderItemsFooterTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#22223b',
+  },
+  orderItemsFooterTotalValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: ACCENT,
+  },
+  selectedProductNameBox: {
+    backgroundColor: '#e3e9f9',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  selectedProductName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#22223b',
+  },
+  selectedProductFormWrap: {
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  formFieldSpacing: {
+    height: 10,
+  },
+}); 
