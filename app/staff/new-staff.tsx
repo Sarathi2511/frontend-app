@@ -4,12 +4,15 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { createStaff } from "../api";
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const ACCENT = "#3D5AFE";
 const roleOptions = ["Admin", "Staff", "Executive"];
 
 export default function NewStaffScreen() {
   const router = useRouter();
+  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     role: roleOptions[0],
@@ -103,6 +106,7 @@ export default function NewStaffScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>New Staff</Text>
+            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}

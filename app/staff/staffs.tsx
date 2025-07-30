@@ -3,6 +3,8 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteStaff, getStaff } from "../api";
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const ACCENT = "#3D5AFE";
 
@@ -12,6 +14,7 @@ export default function StaffsScreen() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [menuStaff, setMenuStaff] = useState<any>(null);
+  const { lastProductEvent } = useSocket();
 
   const fetchAndSetStaffs = async () => {
     setLoading(true);
@@ -28,6 +31,16 @@ export default function StaffsScreen() {
   useEffect(() => {
     fetchAndSetStaffs();
   }, []);
+
+  // Listen for real-time staff updates
+  useEffect(() => {
+    if (lastProductEvent) {
+      // Refresh staff list when real-time events occur
+      if (lastProductEvent.type === 'staff_created' || lastProductEvent.type === 'staff_updated' || lastProductEvent.type === 'staff_deleted') {
+        fetchAndSetStaffs();
+      }
+    }
+  }, [lastProductEvent]);
 
   // Filter staff by search
   const filteredStaffs = staffs.filter(
@@ -76,6 +89,7 @@ export default function StaffsScreen() {
           <Ionicons name="arrow-back" size={22} color={ACCENT} />
         </Pressable>
         <Text style={styles.headerTitle}>Staff</Text>
+        <ConnectionStatus />
       </View>
       {loading ? (
         <View style={styles.loaderWrap}>

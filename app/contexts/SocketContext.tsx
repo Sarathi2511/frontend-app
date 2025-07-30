@@ -132,6 +132,34 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         });
       });
 
+      // Staff events (for admins only)
+      newSocket.on('staff:created', (data) => {
+        addNotification({
+          type: 'staff_created',
+          title: 'Staff Created',
+          message: `${data.staff.name} (${data.staff.role}) was created by ${data.createdBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
+      newSocket.on('staff:updated', (data) => {
+        addNotification({
+          type: 'staff_updated',
+          title: 'Staff Updated',
+          message: `${data.staff.name} (${data.staff.role}) was updated by ${data.updatedBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
+      newSocket.on('staff:deleted', (data) => {
+        addNotification({
+          type: 'staff_deleted',
+          title: 'Staff Deleted',
+          message: `${data.staffName} was deleted by ${data.deletedBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
       setSocket(newSocket);
       return true;
 

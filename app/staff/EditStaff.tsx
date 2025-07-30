@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getStaff, updateStaff } from "../api";
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const ACCENT = "#3D5AFE";
 const roleOptions = ["Admin", "Staff", "Executive"];
@@ -11,6 +13,7 @@ const roleOptions = ["Admin", "Staff", "Executive"];
 export default function EditStaffScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     role: roleOptions[0],
@@ -93,6 +96,7 @@ export default function EditStaffScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>Edit Staff</Text>
+            <ConnectionStatus />
           </View>
           <ScrollView 
             contentContainerStyle={styles.container} 

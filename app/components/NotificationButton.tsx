@@ -17,6 +17,12 @@ const NotificationButton: React.FC = () => {
         return '✏️';
       case 'product_deleted':
         return '🗑️';
+      case 'staff_created':
+        return '👤';
+      case 'staff_updated':
+        return '✏️';
+      case 'staff_deleted':
+        return '🗑️';
       case 'user_connected':
         return '🟢';
       case 'user_disconnected':
