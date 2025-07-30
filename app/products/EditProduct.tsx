@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, ActivityIndicator, Alert, Animated, SafeAreaView } from "react-native";
 import { getProducts, updateProduct } from "../api";
 import { Ionicons } from '@expo/vector-icons';
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const ACCENT = "#3D5AFE";
 const dimensionOptions = [
@@ -28,6 +30,7 @@ const dimensionIcons: { [key: string]: string } = {
 export default function EditProductScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     stockQuantity: '',
@@ -132,6 +135,7 @@ export default function EditProductScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>Edit Product</Text>
+            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}

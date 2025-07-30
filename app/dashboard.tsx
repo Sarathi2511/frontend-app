@@ -6,6 +6,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Modal, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
 import { getCurrentUserId, getOrdersAssignedTo, logout } from './api';
+import NotificationButton from './components/NotificationButton';
 
 const { width } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
@@ -203,15 +204,18 @@ export default function DashboardScreen() {
               <Text style={styles.greetingName}>{firstName} <Text style={{ fontSize: 20 }}>👋</Text></Text>
               <Text style={styles.userRole}>{userRole}</Text>
             </View>
-            <Pressable 
-              style={({ pressed }) => [
-                styles.logoutButton,
-                pressed && { opacity: 0.7 }
-              ]} 
-              onPress={handleLogout}
-            >
-              <Ionicons name="log-out-outline" size={24} color={ACCENT} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              <NotificationButton />
+              <Pressable 
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  pressed && { opacity: 0.7 }
+                ]} 
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={24} color={ACCENT} />
+              </Pressable>
+            </View>
           </View>
         </LinearGradient>
         {/* Dashboard Title Section */}
@@ -415,6 +419,10 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontWeight: "600",
     fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   logoutButton: {
     padding: 8,

@@ -77,7 +77,8 @@ export default function NewStaffScreen() {
         }).start(() => {
           setShowToast(false);
           toastAnim.setValue(0);
-          router.replace({ pathname: '/dashboard', params: { role: form.role } });
+          // Navigate back to staff list instead of dashboard
+          router.replace('/staff');
         });
       }
     } catch (err) {

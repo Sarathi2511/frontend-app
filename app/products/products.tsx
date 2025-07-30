@@ -4,6 +4,10 @@ import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View, ActivityI
 import { getProducts, deleteProduct } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
+
+
 
 const ACCENT = "#3D5AFE";
 
@@ -15,6 +19,7 @@ export default function ProductsScreen() {
   const [loading, setLoading] = useState(true);
   const [menuProduct, setMenuProduct] = useState<any>(null);
   const [search, setSearch] = useState("");
+  const { isConnected, lastProductEvent } = useSocket();
 
   const fetchAndSetProducts = async () => {
     setLoading(true);
@@ -31,6 +36,16 @@ export default function ProductsScreen() {
   useEffect(() => {
     fetchAndSetProducts();
   }, []);
+
+  // Listen for real-time product updates
+  useEffect(() => {
+    if (lastProductEvent) {
+      // Refresh products list when real-time events occur
+      if (lastProductEvent.type === 'created' || lastProductEvent.type === 'updated' || lastProductEvent.type === 'deleted') {
+        fetchAndSetProducts();
+      }
+    }
+  }, [lastProductEvent]);
 
   const handleMenu = (product: any) => setMenuProduct(product);
   const closeMenu = () => setMenuProduct(null);
@@ -79,6 +94,7 @@ export default function ProductsScreen() {
           <Ionicons name="arrow-back" size={22} color={ACCENT} />
         </Pressable>
         <Text style={styles.headerTitle}>Products</Text>
+        <ConnectionStatus />
       </View>
       {loading ? (
         <View style={styles.loaderWrap}>
@@ -86,6 +102,7 @@ export default function ProductsScreen() {
         </View>
       ) : (
         <>
+
           {/* Search Bar */}
           <View style={styles.filterBar}>
             <TextInput

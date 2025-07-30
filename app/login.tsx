@@ -4,6 +4,7 @@ import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Platform, Pre
 import { login } from "./api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { useSocket } from "./contexts/SocketContext";
 
 const { width, height } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
@@ -20,6 +21,7 @@ export default function LoginScreen() {
   const router = useRouter();
   const logoAnim = useState(new Animated.Value(0))[0];
   const buttonAnim = useRef(new Animated.Value(1)).current;
+  const { connect } = useSocket();
 
   // Check if user is already logged in
   useEffect(() => {
@@ -28,11 +30,13 @@ export default function LoginScreen() {
       const role = await AsyncStorage.getItem('userRole');
       const name = await AsyncStorage.getItem('userName');
       if (token && role) {
+        // Establish WebSocket connection for already logged in user
+        await connect();
         router.replace({ pathname: "./dashboard", params: { role, name } });
       }
     };
     checkLoginStatus();
-  }, []);
+  }, [connect]);
 
   useEffect(() => {
     Animated.spring(logoAnim, {
@@ -70,6 +74,12 @@ export default function LoginScreen() {
         // Store user name and userId for future use
         await AsyncStorage.setItem('userName', data.name);
         if (data.userId) await AsyncStorage.setItem('userId', data.userId);
+        
+        // Establish WebSocket connection after successful login
+        // Small delay to ensure token is properly stored
+        await new Promise(resolve => setTimeout(resolve, 100));
+        await connect();
+        
         router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
       } else {
         Alert.alert("Login Failed", "Invalid phone number or password");

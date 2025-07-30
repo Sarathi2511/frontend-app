@@ -4,6 +4,8 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { createProduct } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
+import { useSocket } from "../contexts/SocketContext";
+import ConnectionStatus from "../components/ConnectionStatus";
 
 const ACCENT = "#3D5AFE";
 const dimensionOptions = [
@@ -30,6 +32,7 @@ const dimensionIcons: { [key: string]: string } = {
 export default function NewProductScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     stockQuantity: '',
@@ -102,6 +105,7 @@ export default function NewProductScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>New Product</Text>
+            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}
