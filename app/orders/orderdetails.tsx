@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getOrders } from "../api";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
 
@@ -207,33 +208,38 @@ function Detail({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   screenWrap: {
     flex: 1,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: androidUI.colors.background,
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: androidUI.colors.surface,
+    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
+    paddingBottom: androidUI.spacing.lg,
+    paddingHorizontal: androidUI.spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    height: Platform.OS === 'ios' ? 44 : 56,
+    borderBottomColor: androidUI.colors.border,
+    elevation: 4,
+    zIndex: 10,
+    minHeight: 68,
   },
   backBtn: {
-    padding: 8,
-    marginLeft: -8,
+    backgroundColor: androidUI.colors.border,
+    borderRadius: androidUI.borderRadius.large,
+    padding: androidUI.spacing.sm,
+    marginRight: androidUI.spacing.md,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: ACCENT,
-    marginLeft: 10,
-    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+    color: androidUI.colors.text.primary,
+    letterSpacing: 0.2,
+    fontFamily: androidUI.fontFamily.medium,
   },
   container: {
     paddingTop: 20,
     paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    paddingHorizontal: 18,
+    paddingHorizontal: androidUI.spacing.lg,
     flexGrow: 1,
   },
   detailRow: {
@@ -243,13 +249,13 @@ const styles = StyleSheet.create({
   },
   detailLabel: {
     fontWeight: '600',
-    color: '#22223b',
+    color: androidUI.colors.text.primary,
     width: 140,
     fontSize: 15,
   },
   detailValue: {
     flex: 1,
-    color: '#444',
+    color: androidUI.colors.text.secondary,
     fontSize: 15,
   },
   badgeContainer: {
@@ -292,15 +298,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   orderItemCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.lg,
+    marginBottom: androidUI.spacing.md,
+    ...androidUI.shadow,
   },
   orderItemRow: {
     flexDirection: 'row',

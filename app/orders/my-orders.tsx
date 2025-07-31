@@ -6,6 +6,7 @@ import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrd
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useSocket } from "../contexts/SocketContext";
+import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
 const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
@@ -571,58 +572,64 @@ export default function MyOrdersScreen() {
 const styles = StyleSheet.create({
   screenWrap: {
     flex: 1,
-    backgroundColor: '#f5f7fa',
-    paddingHorizontal: 18,
+    backgroundColor: androidUI.colors.background,
+    paddingHorizontal: androidUI.spacing.lg,
     paddingTop: 32,
   },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    backgroundColor: androidUI.colors.surface,
+    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
+    paddingBottom: androidUI.spacing.lg,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: androidUI.colors.border,
+    elevation: 4,
+    zIndex: 10,
+    minHeight: 68,
+    marginBottom: androidUI.spacing.lg,
   },
   backBtn: {
-    padding: 8,
+    backgroundColor: androidUI.colors.border,
+    borderRadius: androidUI.borderRadius.large,
+    padding: androidUI.spacing.sm,
+    marginRight: androidUI.spacing.md,
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: ACCENT,
-    marginLeft: 10,
+    color: androidUI.colors.text.primary,
+    letterSpacing: 0.2,
+    fontFamily: androidUI.fontFamily.medium,
   },
   filterBar: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.md,
+    marginBottom: androidUI.spacing.md,
+    ...androidUI.shadow,
   },
   searchInput: {
     fontSize: 15,
-    color: '#222',
+    color: androidUI.colors.text.primary,
   },
   loaderWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f5f7fa',
+    backgroundColor: androidUI.colors.background,
   },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 14,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.lg,
+    marginBottom: androidUI.spacing.md,
+    ...androidUI.cardShadow,
     shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
   },
   cardPressed: {
-    opacity: 0.8,
+    ...androidUI.buttonPress,
   },
   cardRowTop: {
     flexDirection: 'row',
@@ -647,7 +654,7 @@ const styles = StyleSheet.create({
   customerName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#22223b',
+    color: androidUI.colors.text.primary,
   },
   chipGroup: {
     flexDirection: 'row',
@@ -656,9 +663,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    marginRight: 8,
+    paddingHorizontal: androidUI.spacing.sm,
+    borderRadius: androidUI.borderRadius.medium,
+    marginRight: androidUI.spacing.sm,
   },
   statusChipText: {
     fontSize: 12,
@@ -697,7 +704,7 @@ const styles = StyleSheet.create({
   },
   created: {
     fontSize: 13,
-    color: '#6c6f7b',
+    color: androidUI.colors.text.secondary,
   },
   createdDate: {
     fontWeight: '600',
@@ -716,25 +723,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 10,
+    backgroundColor: androidUI.colors.surface,
+    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
+    borderTopRightRadius: androidUI.borderRadius.xxlarge,
+    padding: androidUI.spacing.lg,
+    ...androidUI.modalShadow,
   },
   menuItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    marginBottom: 8,
+    paddingVertical: androidUI.spacing.md,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    marginBottom: androidUI.spacing.sm,
   },
   menuItemText: {
     fontSize: 16,
-    color: '#222',
+    color: androidUI.colors.text.primary,
   },
   menuItemDestructive: {
     backgroundColor: '#ffebee',
@@ -751,20 +754,20 @@ const styles = StyleSheet.create({
     color: '#9e9e9e',
   },
   dropdown: {
-    marginBottom: 12,
+    marginBottom: androidUI.spacing.md,
   },
   chipScroll: {
     flexDirection: 'row',
-    marginBottom: 14,
-    paddingHorizontal: 10,
+    marginBottom: androidUI.spacing.md,
+    paddingHorizontal: androidUI.spacing.sm,
   },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: androidUI.spacing.md,
     borderRadius: 20,
-    marginRight: 8,
+    marginRight: androidUI.spacing.sm,
     backgroundColor: '#e0e0e0',
   },
   chipActive: {
@@ -789,7 +792,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#6c6f7b',
+    color: androidUI.colors.text.secondary,
     textAlign: 'center',
   },
 }); 
