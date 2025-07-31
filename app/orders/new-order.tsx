@@ -251,7 +251,7 @@ export default function NewOrderScreen() {
         }).start(() => {
           setShowToast(false);
           toastAnim.setValue(0);
-          router.replace('/orders/orders');
+          router.replace({ pathname: '/orders/orders', params: { role: params.role, name: params.name } });
         });
       }
     } catch (err) {

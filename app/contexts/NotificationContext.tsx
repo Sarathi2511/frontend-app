@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 interface Notification {
   id: string;
-  type: 'product_created' | 'product_updated' | 'product_deleted' | 'user_connected' | 'user_disconnected' | 'staff_created' | 'staff_updated' | 'staff_deleted';
+  type: 'product_created' | 'product_updated' | 'product_deleted' | 'staff_created' | 'staff_updated' | 'staff_deleted' | 'order_created' | 'order_updated' | 'order_deleted';
   title: string;
   message: string;
   timestamp: Date;

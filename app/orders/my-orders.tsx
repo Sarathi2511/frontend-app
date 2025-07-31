@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrder } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
+import { useSocket } from "../contexts/SocketContext";
 
 const ACCENT = "#3D5AFE";
 const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
@@ -115,6 +116,80 @@ export default function MyOrdersScreen() {
     }
     setFilteredOrders(filtered);
   }, [search, orders]);
+
+  // WebSocket event listeners for real-time updates
+  const { socket } = useSocket();
+  
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for order creation events (only if assigned to current user)
+    const handleOrderCreated = async (data: any) => {
+      try {
+        const userId = await getCurrentUserId();
+        if (!userId) return;
+        
+        // Check if the new order is assigned to current user
+        if (data.order.assignedToId === userId) {
+          setOrders(prevOrders => {
+            const newOrder = data.order;
+            // Check if order already exists to avoid duplicates
+            const exists = prevOrders.find(order => order._id === newOrder._id);
+            if (exists) return prevOrders;
+            return [newOrder, ...prevOrders];
+          });
+        }
+      } catch (err) {
+        console.error('Error handling order created event:', err);
+      }
+    };
+
+    // Listen for order update events (only if assigned to current user)
+    const handleOrderUpdated = async (data: any) => {
+      try {
+        const userId = await getCurrentUserId();
+        if (!userId) return;
+        
+        // Check if the updated order is assigned to current user
+        if (data.order.assignedToId === userId) {
+          setOrders(prevOrders => 
+            prevOrders.map(order => 
+              order._id === data.order._id ? data.order : order
+            )
+          );
+        }
+      } catch (err) {
+        console.error('Error handling order updated event:', err);
+      }
+    };
+
+    // Listen for order deletion events (only if assigned to current user)
+    const handleOrderDeleted = async (data: any) => {
+      try {
+        const userId = await getCurrentUserId();
+        if (!userId) return;
+        
+        // Remove the order from the list if it was assigned to current user
+        setOrders(prevOrders => 
+          prevOrders.filter(order => order._id !== data.orderId)
+        );
+      } catch (err) {
+        console.error('Error handling order deleted event:', err);
+      }
+    };
+
+    // Add event listeners
+    socket.on('order:created', handleOrderCreated);
+    socket.on('order:updated', handleOrderUpdated);
+    socket.on('order:deleted', handleOrderDeleted);
+
+    // Cleanup event listeners
+    return () => {
+      socket.off('order:created', handleOrderCreated);
+      socket.off('order:updated', handleOrderUpdated);
+      socket.off('order:deleted', handleOrderDeleted);
+    };
+  }, [socket]);
 
   // Menu actions (replicated from orders.tsx)
   const handleMenu = (order: any) => setMenuOrder(order);

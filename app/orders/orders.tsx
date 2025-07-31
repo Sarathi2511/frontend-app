@@ -1,10 +1,12 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, updateOrder, deleteOrder, getStaff } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useLocalSearchParams } from "expo-router";
+import { useSocket } from "../contexts/SocketContext";
 
 const ACCENT = "#3D5AFE";
 
@@ -662,6 +664,14 @@ export default function OrdersScreen() {
     fetchStaffList(); // Fetch staff list on component mount
   }, []);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchAndSetOrders();
+      fetchStaffList();
+    }, [])
+  );
+
   useEffect(() => {
     let filtered = [...orders];
     if (search.trim()) {
@@ -675,6 +685,55 @@ export default function OrdersScreen() {
     }
     setFilteredOrders(filtered);
   }, [search, statusFilter, orders]);
+
+  // WebSocket event listeners for real-time updates
+  const { socket } = useSocket();
+  
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for order creation events
+    const handleOrderCreated = (data: any) => {
+      // Add the new order to the list
+      setOrders(prevOrders => {
+        const newOrder = data.order;
+        // Check if order already exists to avoid duplicates
+        const exists = prevOrders.find(order => order._id === newOrder._id);
+        if (exists) return prevOrders;
+        return [newOrder, ...prevOrders];
+      });
+    };
+
+    // Listen for order update events
+    const handleOrderUpdated = (data: any) => {
+      // Update the order in the list
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order._id === data.order._id ? data.order : order
+        )
+      );
+    };
+
+    // Listen for order deletion events
+    const handleOrderDeleted = (data: any) => {
+      // Remove the order from the list
+      setOrders(prevOrders => 
+        prevOrders.filter(order => order._id !== data.orderId)
+      );
+    };
+
+    // Add event listeners
+    socket.on('order:created', handleOrderCreated);
+    socket.on('order:updated', handleOrderUpdated);
+    socket.on('order:deleted', handleOrderDeleted);
+
+    // Cleanup event listeners
+    return () => {
+      socket.off('order:created', handleOrderCreated);
+      socket.off('order:updated', handleOrderUpdated);
+      socket.off('order:deleted', handleOrderDeleted);
+    };
+  }, [socket]);
 
   const handleMenu = (order: any) => setMenuOrder(order);
   const closeMenu = () => setMenuOrder(null);

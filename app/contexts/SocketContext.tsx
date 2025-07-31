@@ -113,24 +113,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         });
       });
 
-      // User connection events (for admins)
-      newSocket.on('user:connected', (data) => {
-        addNotification({
-          type: 'user_connected',
-          title: 'User Connected',
-          message: `${data.user.name} (${data.user.role}) is now online`,
-          timestamp: new Date()
-        });
-      });
 
-      newSocket.on('user:disconnected', (data) => {
-        addNotification({
-          type: 'user_disconnected',
-          title: 'User Disconnected',
-          message: `${data.user.name} (${data.user.role}) went offline`,
-          timestamp: new Date()
-        });
-      });
 
       // Staff events (for admins only)
       newSocket.on('staff:created', (data) => {
@@ -156,6 +139,34 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           type: 'staff_deleted',
           title: 'Staff Deleted',
           message: `${data.staffName} was deleted by ${data.deletedBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
+      // Order events
+      newSocket.on('order:created', (data) => {
+        addNotification({
+          type: 'order_created',
+          title: 'Order Created',
+          message: `Order ${data.order.orderId} (${data.order.customerName}) was created by ${data.createdBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
+      newSocket.on('order:updated', (data) => {
+        addNotification({
+          type: 'order_updated',
+          title: 'Order Updated',
+          message: `Order ${data.order.orderId} (${data.order.customerName}) was updated by ${data.updatedBy.name}`,
+          timestamp: new Date()
+        });
+      });
+
+      newSocket.on('order:deleted', (data) => {
+        addNotification({
+          type: 'order_deleted',
+          title: 'Order Deleted',
+          message: `Order ${data.orderId} (${data.orderName}) was deleted by ${data.deletedBy.name}`,
           timestamp: new Date()
         });
       });
