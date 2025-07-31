@@ -47,11 +47,7 @@ const modules = [
   },
 ];
 
-const fabOptions = [
-  { key: 'order', label: 'New Order', icon: '📝', roles: ["Admin", "Staff", "Executive"] },
-  { key: 'product', label: 'New Product', icon: '📦', roles: ["Admin", "Staff", "Executive"] },  // Added Executive
-  { key: 'staff', label: 'New Staff', icon: '👤', roles: ["Admin"] },
-];
+
 
 const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
 const mockStaff = ["Ravi Kumar", "Priya Singh", "Amit Patel", "Sunita Rao"];
@@ -61,18 +57,12 @@ export default function DashboardScreen() {
   const { role, name } = useLocalSearchParams();
   const userName = typeof name === 'string' ? name : Array.isArray(name) ? name[0] : "User";
   const userRole = typeof role === 'string' ? role : Array.isArray(role) ? role[0] : "User";
-  const [fabOpen, setFabOpen] = useState(false);
   const router = useRouter();
-  const subtitleAnim = useRef(new Animated.Value(0)).current;
-  const [myOrdersCount, setMyOrdersCount] = useState<number>(0);
 
-  useEffect(() => {
-    Animated.timing(subtitleAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const [myOrdersCount, setMyOrdersCount] = useState<number>(0);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+
 
   useEffect(() => {
     const fetchMyOrdersCount = async () => {
@@ -110,19 +100,7 @@ export default function DashboardScreen() {
   // Filter modules based on user role
   const allowedModules = modules.filter(mod => mod.roles.includes(userRole));
   
-  // Filter FAB options based on user role
-  const allowedFabOptions = fabOptions.filter(opt => opt.roles.includes(userRole));
 
-  const handleFabOption = (key: string) => {
-    setFabOpen(false);
-    if (key === 'order') {
-      router.push({ pathname: './orders/new-order', params: { name, role } });
-    } else if (key === 'product') {
-      router.push({ pathname: './products/new-product', params: { role } });
-    } else if (key === 'staff' && userRole === 'Admin') {
-      router.push({ pathname: './staff/new-staff', params: { role } });
-    }
-  };
 
   const handleImagePick = async () => {
     // setImageUploading(true); // Removed
@@ -146,6 +124,17 @@ export default function DashboardScreen() {
     // For now, just log the order // Removed
     // setOrderModal(false); // Removed
     console.log('Order Submitted:', 'Order Form Data'); // Modified
+  };
+
+  const handleQuickAction = (action: string) => {
+    setShowQuickActions(false);
+    if (action === 'order') {
+      router.push({ pathname: './orders/new-order', params: { name, role } });
+    } else if (action === 'product') {
+      router.push({ pathname: './products/new-product', params: { role } });
+    } else if (action === 'staff' && userRole === 'Admin') {
+      router.push({ pathname: './staff/new-staff', params: { role } });
+    }
   };
 
   const handleLogout = async () => {
@@ -222,15 +211,18 @@ export default function DashboardScreen() {
         {/* Dashboard Title Section */}
         <View style={styles.dashboardTitleWrap}>
           <View style={styles.dashboardTitleRow}>
-            <Text style={styles.dashboardIcon}>🧭</Text>
-            <Text style={styles.dashboardTitle}>Dashboard</Text>
+            <View style={styles.dashboardTitleLeft}>
+              <Text style={styles.dashboardIcon}>🧭</Text>
+              <Text style={styles.dashboardTitle}>Dashboard</Text>
+            </View>
+            <Pressable 
+              style={styles.dashboardAddButton}
+              onPress={() => setShowQuickActions(true)}
+            >
+              <Text style={styles.dashboardAddButtonText}>+</Text>
+            </Pressable>
           </View>
           <View style={styles.dashboardDivider} />
-          <Animated.Text
-            style={[styles.dashboardSubtitle, { opacity: subtitleAnim, transform: [{ translateY: subtitleAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }] }]}
-          >
-            Here’s what’s happening today
-          </Animated.Text>
         </View>
         {/* Dashboard Modules */}
         <View style={styles.modulesWrap}>
@@ -325,34 +317,38 @@ export default function DashboardScreen() {
             );
           })}
         </View>
-        {/* FAB Modal */}
-        <Modal
-          visible={fabOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFabOpen(false)}
-        >
-          <TouchableWithoutFeedback onPress={() => setFabOpen(false)}>
-            <View style={styles.modalOverlay} />
+        
+        {/* Quick Actions Overlay */}
+        {showQuickActions && (
+          <TouchableWithoutFeedback onPress={() => setShowQuickActions(false)}>
+            <View style={styles.quickActionsOverlay}>
+              <View style={styles.quickActionsContainer}>
+                <Pressable 
+                  style={styles.quickActionButton}
+                  onPress={() => handleQuickAction('order')}
+                >
+                  <Text style={styles.quickActionIcon}>📝</Text>
+                  <Text style={styles.quickActionLabel}>Orders</Text>
+                </Pressable>
+                <Pressable 
+                  style={styles.quickActionButton}
+                  onPress={() => handleQuickAction('product')}
+                >
+                  <Text style={styles.quickActionIcon}>📦</Text>
+                  <Text style={styles.quickActionLabel}>Products</Text>
+                </Pressable>
+                {userRole === 'Admin' && (
+                  <Pressable 
+                    style={styles.quickActionButton}
+                    onPress={() => handleQuickAction('staff')}
+                  >
+                    <Text style={styles.quickActionIcon}>👤</Text>
+                    <Text style={styles.quickActionLabel}>Staff</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
           </TouchableWithoutFeedback>
-          <View style={styles.fabModalSheet}>
-            {allowedFabOptions.map(opt => (
-              <Pressable
-                key={opt.key}
-                style={({ pressed }) => [styles.fabOption, pressed && styles.fabOptionPressed]}
-                onPress={() => handleFabOption(opt.key)}
-              >
-                <Text style={styles.fabOptionIcon}>{opt.icon}</Text>
-                <Text style={styles.fabOptionLabel}>{opt.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
-        {/* Floating Action Button */}
-        {allowedFabOptions.length > 0 && (
-          <Pressable style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]} onPress={() => setFabOpen(true)}>
-            <Text style={styles.fabIcon}>＋</Text>
-          </Pressable>
         )}
       </View>
     </View>
@@ -492,71 +488,7 @@ const styles = StyleSheet.create({
     color: androidUI.colors.text.secondary,
     fontFamily: androidUI.fontFamily.regular,
   },
-  fab: {
-    position: "absolute",
-    right: width * 0.06,
-    bottom: 36,
-    backgroundColor: ACCENT,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    alignItems: "center",
-    justifyContent: "center",
-    ...androidUI.cardShadow,
-    shadowColor: ACCENT,
-  },
-  fabPressed: {
-    backgroundColor: "#304ffe",
-    shadowOpacity: 0.28,
-    ...androidUI.buttonPress,
-  },
-  fabIcon: {
-    color: "#fff",
-    fontSize: 32,
-    fontWeight: "700",
-    marginTop: -2,
-  },
-  // FAB Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  fabModalSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.xxl,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-  },
-  fabOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.sm,
-    borderRadius: androidUI.borderRadius.medium,
-    marginBottom: 6,
-    backgroundColor: '#f6f9fc',
-    shadowColor: 'transparent',
-  },
-  fabOptionPressed: {
-    backgroundColor: '#e3e9f9',
-    opacity: 0.92,
-  },
-  fabOptionIcon: {
-    fontSize: 22,
-    marginRight: 16,
-  },
-  fabOptionLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: androidUI.colors.text.primary,
-    fontFamily: androidUI.fontFamily.medium,
-  },
+
   orderModalSheetWrap: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -722,7 +654,27 @@ const styles = StyleSheet.create({
   dashboardTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 2,
+  },
+  dashboardTitleLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dashboardAddButton: {
+    backgroundColor: ACCENT,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...androidUI.shadow,
+  },
+  dashboardAddButtonText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: androidUI.fontFamily.medium,
   },
   dashboardIcon: {
     fontSize: 24,
@@ -741,14 +693,7 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     width: '100%',
   },
-  dashboardSubtitle: {
-    fontSize: 15,
-    color: '#6c6f7b',
-    fontWeight: '500',
-    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
-    marginTop: 2,
-    marginBottom: 2,
-  },
+
   ctaArrowWrap: {
     marginLeft: 12,
     backgroundColor: '#f3f6fa',
@@ -756,5 +701,43 @@ const styles = StyleSheet.create({
     padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Quick Actions Styles
+  quickActionsOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  quickActionsContainer: {
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.xxlarge,
+    padding: androidUI.spacing.xxl,
+    flexDirection: 'row',
+    gap: androidUI.spacing.xl,
+    ...androidUI.modalShadow,
+  },
+  quickActionButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.medium,
+    backgroundColor: '#f6f9fc',
+    minWidth: 80,
+  },
+  quickActionIcon: {
+    fontSize: 32,
+    marginBottom: androidUI.spacing.sm,
+  },
+  quickActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    fontFamily: androidUI.fontFamily.medium,
   },
 }); 
