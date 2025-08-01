@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState, useCallback } from "react";
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
 import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, updateOrder, deleteOrder, getStaff } from "../api";
 import { Ionicons } from '@expo/vector-icons';
@@ -546,6 +546,78 @@ const styles = StyleSheet.create({
     color: '#ff5252',
     fontWeight: '700',
   },
+  menuIconBtnActive: {
+    backgroundColor: '#e3eaff',
+    transform: [{ scale: 1.05 }],
+  },
+  actionMenu: {
+    marginTop: androidUI.spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: androidUI.spacing.sm,
+    overflow: 'hidden',
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+  },
+  actionButton: {
+    width: '47%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: '1.5%',
+    marginBottom: 4,
+    borderRadius: androidUI.borderRadius.medium,
+    backgroundColor: '#f6f9fc',
+    borderWidth: 1,
+    borderColor: '#e3e9f9',
+  },
+  actionButtonDisabled: {
+    opacity: 0.5,
+    backgroundColor: '#f0f0f0',
+  },
+  actionButtonDestructive: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#fecaca',
+  },
+  actionButtonIcon: {
+    marginRight: 8,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    flex: 1,
+  },
+  actionButtonTextDisabled: {
+    color: '#999',
+  },
+  actionButtonTextDestructive: {
+    color: '#e53935',
+  },
+  statusButton: {
+    backgroundColor: '#f3f6fa',
+    borderColor: '#e3e9f9',
+    borderRadius: androidUI.borderRadius.small,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  statusButtonText: {
+    color: '#3D5AFE',
+    fontWeight: '600',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
 });
 
 function getStatusStyle(status: string) {
@@ -575,8 +647,6 @@ export default function OrdersScreen() {
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOrder, setMenuOrder] = useState<any>(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusOrder, setStatusOrder] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string | null>(null);
@@ -603,6 +673,11 @@ export default function OrdersScreen() {
   const [selectedMarkedBy, setSelectedMarkedBy] = useState<string | null>(null);
   const [selectedRecievedBy, setSelectedRecievedBy] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<any>(null);
+  
+  // Inline dropdown state
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const [showStatusOptions, setShowStatusOptions] = useState<string | null>(null);
+  const animatedHeight = useState(new Animated.Value(0))[0];
 
   // Convert staff list to dropdown format
   const staffDropdownItems = staffList.map(staff => ({
@@ -675,6 +750,15 @@ export default function OrdersScreen() {
   // WebSocket event listeners for real-time updates
   const { socket } = useSocket();
   
+  // Animate dropdown expansion/collapse
+  useEffect(() => {
+    Animated.timing(animatedHeight, {
+      toValue: expandedOrderId ? 150 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [expandedOrderId]);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -721,8 +805,21 @@ export default function OrdersScreen() {
     };
   }, [socket]);
 
-  const handleMenu = (order: any) => setMenuOrder(order);
-  const closeMenu = () => setMenuOrder(null);
+  const handleMenu = (order: any) => {
+    if (expandedOrderId === order._id) {
+      setExpandedOrderId(null);
+      setShowStatusOptions(null);
+    } else {
+      setExpandedOrderId(order._id);
+      setMenuOrder(order);
+      setShowStatusOptions(null);
+    }
+  };
+  const closeMenu = () => {
+    setExpandedOrderId(null);
+    setMenuOrder(null);
+    setShowStatusOptions(null);
+  };
 
   const handleViewDetails = () => {
     closeMenu();
@@ -746,25 +843,21 @@ export default function OrdersScreen() {
   };
 
   const handleChangeStatus = () => {
-    setStatusOrder(menuOrder);
-    setMenuOrder(null);
-    setTimeout(() => setShowStatusModal(true), 200);
+    setShowStatusOptions(menuOrder._id);
   };
 
   const handleSelectStatus = async (status: string) => {
-    setShowStatusModal(false);
-    if (!statusOrder) return;
+    setShowStatusOptions(null);
+    if (!menuOrder) return;
     if (status === 'Dispatched') {
       // Open delivery partner modal
-      setPendingStatusChange({ orderId: statusOrder.orderId, newStatus: status, prevStatus: statusOrder.orderStatus });
+      setPendingStatusChange({ orderId: menuOrder.orderId, newStatus: status, prevStatus: menuOrder.orderStatus });
       setSelectedDeliveryPartner(null);
       setShowDeliveryModal(true);
-      setStatusOrder(null);
       return;
     }
-    setStatusOrder(null);
     try {
-      await updateOrder(statusOrder.orderId, { orderStatus: status });
+      await updateOrder(menuOrder.orderId, { orderStatus: status });
       fetchAndSetOrders();
     } catch (err: any) {
       console.error('Status update failed:', err.response?.data || err.message);
@@ -951,14 +1044,20 @@ export default function OrdersScreen() {
                 styles.card,
                 pressed && styles.cardPressed
               ]}
-              onPress={() => handleMenu(item)}
             >
               {/* Line 1: Order ID and menu icon */}
               <View style={styles.cardRowTop}>
                 <Text style={styles.orderId}>{item.orderId}</Text>
-                <Pressable style={styles.menuIconBtn} onPress={() => handleMenu(item)}>
-                  <Ionicons name="ellipsis-vertical" size={20} color="#b0b3b8" />
-                </Pressable>
+              <Pressable 
+                style={[styles.menuIconBtn, expandedOrderId === item._id && styles.menuIconBtnActive]} 
+                onPress={() => handleMenu(item)}
+              >
+                <Ionicons 
+                  name={expandedOrderId === item._id ? "chevron-up" : "ellipsis-vertical"} 
+                  size={20} 
+                  color={expandedOrderId === item._id ? "#3D5AFE" : "#b0b3b8"} 
+                />
+              </Pressable>
               </View>
               {/* Line 2: Name and status chips */}
               <View style={styles.cardRowMid}>
@@ -1010,6 +1109,77 @@ export default function OrdersScreen() {
                   </View>
                 ) : null}
               </View>
+              
+              {/* Inline Action Menu */}
+              {expandedOrderId === item._id && (
+                <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
+                  <View style={styles.actionGrid}>
+                    {showStatusOptions === item._id ? (
+                      // Show status options
+                      statusOptions.filter(s => s !== item.orderStatus).map((status) => (
+                        <Pressable
+                          key={status}
+                          style={[styles.actionButton, styles.statusButton]}
+                          onPress={() => handleSelectStatus(status)}
+                        >
+                          <Ionicons
+                            name={
+                              status === 'Pending' ? 'time-outline' :
+                              status === 'DC' ? 'cube-outline' :
+                              status === 'Invoice' ? 'document-text-outline' :
+                              status === 'Dispatched' ? 'send-outline' : 'ellipse-outline'
+                            }
+                            size={20}
+                            color="#3D5AFE"
+                            style={styles.actionButtonIcon}
+                          />
+                          <Text style={[styles.actionButtonText, styles.statusButtonText]}>
+                            {status}
+                          </Text>
+                        </Pressable>
+                      ))
+                    ) : (
+                      // Show regular menu options
+                      getMenuOptions().map((option) => (
+                        <Pressable
+                          key={option.key}
+                          style={[
+                            styles.actionButton,
+                            option.disabled && styles.actionButtonDisabled,
+                            option.destructive && styles.actionButtonDestructive
+                          ]}
+                          onPress={option.disabled ? undefined : option.action}
+                          disabled={option.disabled}
+                        >
+                          <Ionicons
+                            name={
+                              option.key === 'view' ? 'eye-outline' :
+                              option.key === 'print' ? 'print-outline' :
+                              option.key === 'edit' ? 'create-outline' :
+                              option.key === 'status' ? 'swap-horizontal' :
+                              option.key === 'paid' ? 'checkmark-circle-outline' :
+                              option.key === 'delete' ? 'trash-outline' : 'ellipse-outline'
+                            }
+                            size={20}
+                            color={
+                              option.disabled ? '#999' :
+                              option.destructive ? '#e53935' : '#3D5AFE'
+                            }
+                            style={styles.actionButtonIcon}
+                          />
+                          <Text style={[
+                            styles.actionButtonText,
+                            option.disabled && styles.actionButtonTextDisabled,
+                            option.destructive && styles.actionButtonTextDestructive
+                          ]}>
+                            {option.label}
+                          </Text>
+                        </Pressable>
+                      ))
+                    )}
+                  </View>
+                </Animated.View>
+              )}
             </Pressable>
           )}
           refreshing={refreshing}
@@ -1041,53 +1211,6 @@ export default function OrdersScreen() {
             ) : null
           )}
         />
-        {/* Action Menu Modal */}
-        <Modal
-          visible={!!menuOrder}
-          transparent
-          animationType="fade"
-          onRequestClose={closeMenu}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={closeMenu} />
-          <View style={styles.menuSheet}>
-            {getMenuOptions().map(option => (
-              <Pressable
-                key={option.key}
-                style={[
-                  styles.menuItem,
-                  option.disabled && styles.menuItemDisabled,
-                  option.destructive && styles.menuItemDestructive
-                ]}
-                onPress={option.disabled ? undefined : option.action}
-              >
-                <Text style={[
-                  styles.menuItemText,
-                  option.disabled && styles.menuItemTextDisabled,
-                  option.destructive && styles.menuItemTextDestructive
-                ]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
-        {/* Status Change Modal (not nested) */}
-        <Modal
-          visible={showStatusModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowStatusModal(false)}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowStatusModal(false)} />
-          <View style={styles.menuSheet}>
-            {statusOrder && statusOptions.filter(s => s !== statusOrder.orderStatus).map(status => (
-              <Pressable key={status} style={styles.menuItem} onPress={() => handleSelectStatus(status)}>
-                <Text style={styles.menuItemText}>{status}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
-
         {/* Delivery Partner Modal */}
         <Modal
           visible={showDeliveryModal}
