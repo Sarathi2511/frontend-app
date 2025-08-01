@@ -1,14 +1,12 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput } from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput, Animated } from "react-native";
 import { getProducts, deleteProduct } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
-
-
 
 const ACCENT = "#3D5AFE";
 
@@ -18,8 +16,9 @@ export default function ProductsScreen() {
   const userRole = role ? String(role) : "User";
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [menuProduct, setMenuProduct] = useState<any>(null);
   const [search, setSearch] = useState("");
+  const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+  const [animatedHeight] = useState(new Animated.Value(0));
   const { isConnected, lastProductEvent } = useSocket();
 
   const fetchAndSetProducts = async () => {
@@ -48,28 +47,54 @@ export default function ProductsScreen() {
     }
   }, [lastProductEvent]);
 
-  const handleMenu = (product: any) => setMenuProduct(product);
-  const closeMenu = () => setMenuProduct(null);
-
-  const handleEditProduct = () => {
-    closeMenu();
-    if (menuProduct && menuProduct._id) {
-      router.push({ pathname: '/products/EditProduct', params: { id: menuProduct._id, role } });
+  const handleMenuToggle = (productId: string) => {
+    if (expandedProductId === productId) {
+      // Close the menu
+      Animated.timing(animatedHeight, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => setExpandedProductId(null));
+    } else {
+      // Open the menu
+      setExpandedProductId(productId);
+      Animated.timing(animatedHeight, {
+        toValue: 120, // Height for two menu items
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
     }
   };
 
-  const handleDeleteProduct = async () => {
-    closeMenu();
-    if (!menuProduct || userRole !== 'Admin') return;
+  const handleEditProduct = (product: any) => {
+    setExpandedProductId(null);
+    Animated.timing(animatedHeight, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
+    if (product && product._id) {
+      router.push({ pathname: '/products/EditProduct', params: { id: product._id, role } });
+    }
+  };
+
+  const handleDeleteProduct = async (product: any) => {
+    setExpandedProductId(null);
+    Animated.timing(animatedHeight, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
+    if (!product || userRole !== 'Admin') return;
     Alert.alert(
       'Delete Product',
-      `Are you sure you want to delete "${menuProduct.name}"?`,
+      `Are you sure you want to delete "${product.name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete', style: 'destructive', onPress: async () => {
             try {
-              await deleteProduct(menuProduct._id);
+              await deleteProduct(product._id);
               fetchAndSetProducts();
             } catch (err) {
               Alert.alert('Error', 'Failed to delete product');
@@ -103,7 +128,6 @@ export default function ProductsScreen() {
         </View>
       ) : (
         <>
-
           {/* Search Bar */}
           <View style={styles.filterBar}>
             <TextInput
@@ -122,8 +146,17 @@ export default function ProductsScreen() {
                 {/* Top Row: Product Name and Menu Icon */}
                 <View style={styles.cardRowTop}>
                   <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                  <Pressable style={styles.menuIconBtn} onPress={() => handleMenu(item)}>
-                    <Ionicons name="ellipsis-vertical" size={20} color="#b0b3b8" />
+                  <Pressable 
+                    style={[styles.menuIconBtn, expandedProductId === item._id && styles.menuIconBtnActive]} 
+                    onPress={() => handleMenuToggle(item._id)}
+                  >
+                    <Animated.View style={{
+                      transform: [{
+                        rotate: expandedProductId === item._id ? '180deg' : '0deg'
+                      }]
+                    }}>
+                      <Ionicons name="chevron-down" size={20} color={expandedProductId === item._id ? ACCENT : "#b0b3b8"} />
+                    </Animated.View>
                   </Pressable>
                 </View>
                 {/* Middle Row: Stock and Dimension */}
@@ -144,6 +177,29 @@ export default function ProductsScreen() {
                     <Text style={styles.infoValue}>{item.lowStockThreshold}</Text>
                   </View>
                 </View>
+                
+                {/* Animated Action Menu */}
+                {expandedProductId === item._id && (
+                  <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
+                    <Pressable 
+                      style={[styles.actionButton, styles.editButton]} 
+                      onPress={() => handleEditProduct(item)}
+                    >
+                      <Ionicons name="pencil" size={18} color="#3D5AFE" />
+                      <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit Product</Text>
+                    </Pressable>
+                    
+                    {userRole === 'Admin' && (
+                      <Pressable 
+                        style={[styles.actionButton, styles.deleteButton]} 
+                        onPress={() => handleDeleteProduct(item)}
+                      >
+                        <Ionicons name="trash" size={18} color="#e53935" />
+                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete Product</Text>
+                      </Pressable>
+                    )}
+                  </Animated.View>
+                )}
               </View>
             )}
             ListEmptyComponent={() => (
@@ -157,25 +213,6 @@ export default function ProductsScreen() {
           />
         </>
       )}
-      {/* Menu Modal */}
-      <Modal
-        visible={!!menuProduct}
-        transparent
-        animationType="fade"
-        onRequestClose={closeMenu}
-      >
-        <Pressable style={styles.menuOverlay} onPress={closeMenu} />
-        <View style={styles.menuSheetBottom}>
-          <Pressable style={styles.menuItem} onPress={handleEditProduct}>
-            <Text style={styles.menuItemText}>Edit Product</Text>
-          </Pressable>
-          {userRole === 'Admin' && (
-            <Pressable style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: '#eee', marginTop: 6 }]} onPress={handleDeleteProduct}>
-              <Text style={[styles.menuItemText, { color: '#e53935', fontWeight: '700' }]}>Delete Product</Text>
-            </Pressable>
-          )}
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -232,9 +269,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   menuIconBtn: {
-    padding: 6,
+    padding: 8,
     borderRadius: androidUI.borderRadius.large,
     backgroundColor: '#f3f6fa',
+    marginLeft: androidUI.spacing.sm,
+  },
+  menuIconBtnActive: {
+    backgroundColor: '#e3eaff',
+    transform: [{ scale: 1.05 }],
   },
   cardRowMid: {
     flexDirection: 'row',
@@ -269,35 +311,42 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: androidUI.colors.text.primary,
   },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+  actionMenu: {
+    marginTop: androidUI.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: androidUI.spacing.md,
+    overflow: 'hidden',
   },
-  menuSheetBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-  },
-  menuItem: {
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.sm,
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.md,
     borderRadius: androidUI.borderRadius.medium,
-    marginBottom: 6,
-    backgroundColor: '#f6f9fc',
-    shadowColor: 'transparent',
+    marginBottom: 8,
+    gap: 12,
   },
-  menuItemText: {
-    fontSize: 16,
+  editButton: {
+    backgroundColor: '#f0f7ff',
+    borderWidth: 1,
+    borderColor: '#e3eaff',
+  },
+  deleteButton: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  actionButtonText: {
+    fontSize: 15,
     fontWeight: '600',
-    color: androidUI.colors.text.primary,
     fontFamily: androidUI.fontFamily.medium,
+  },
+  editButtonText: {
+    color: ACCENT,
+  },
+  deleteButtonText: {
+    color: '#e53935',
   },
   emptyWrap: {
     alignItems: 'center',

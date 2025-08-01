@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Animated, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteStaff, getStaff } from "../api";
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
@@ -14,7 +14,8 @@ export default function StaffsScreen() {
   const [staffs, setStaffs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [menuStaff, setMenuStaff] = useState<any>(null);
+  const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
+  const [animatedHeight] = useState(new Animated.Value(0));
   const { lastProductEvent } = useSocket();
 
   const fetchAndSetStaffs = async () => {
@@ -50,28 +51,54 @@ export default function StaffsScreen() {
       (s.phone && s.phone.toLowerCase().includes(search.toLowerCase()))
   );
 
-  const handleMenu = (staff: any) => setMenuStaff(staff);
-  const closeMenu = () => setMenuStaff(null);
-
-  const handleEditStaff = () => {
-    closeMenu();
-    if (menuStaff && menuStaff._id) {
-      router.push({ pathname: '/staff/EditStaff', params: { id: menuStaff._id } });
+  const handleMenuToggle = (staffId: string) => {
+    if (expandedStaffId === staffId) {
+      // Close the menu
+      Animated.timing(animatedHeight, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start(() => setExpandedStaffId(null));
+    } else {
+      // Open the menu
+      setExpandedStaffId(staffId);
+      Animated.timing(animatedHeight, {
+        toValue: 120, // Height for two menu items
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
     }
   };
 
-  const handleDeleteStaff = async () => {
-    closeMenu();
-    if (!menuStaff) return;
+  const handleEditStaff = (staff: any) => {
+    setExpandedStaffId(null);
+    Animated.timing(animatedHeight, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
+    if (staff && staff._id) {
+      router.push({ pathname: '/staff/EditStaff', params: { id: staff._id } });
+    }
+  };
+
+  const handleDeleteStaff = async (staff: any) => {
+    setExpandedStaffId(null);
+    Animated.timing(animatedHeight, {
+      toValue: 0,
+      duration: 150,
+      useNativeDriver: false,
+    }).start();
+    if (!staff) return;
     Alert.alert(
       'Delete Staff',
-      `Are you sure you want to delete "${menuStaff.name}"?`,
+      `Are you sure you want to delete "${staff.name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete', style: 'destructive', onPress: async () => {
             try {
-              await deleteStaff(menuStaff._id);
+              await deleteStaff(staff._id);
               fetchAndSetStaffs();
             } catch (err) {
               Alert.alert('Error', 'Failed to delete staff');
@@ -119,8 +146,17 @@ export default function StaffsScreen() {
                   <View style={styles.roleChip}>
                     <Text style={styles.roleChipText}>{item.role}</Text>
                   </View>
-                  <Pressable style={styles.menuIconBtn} onPress={() => handleMenu(item)}>
-                    <Ionicons name="ellipsis-vertical" size={20} color="#b0b3b8" />
+                  <Pressable 
+                    style={[styles.menuIconBtn, expandedStaffId === item._id && styles.menuIconBtnActive]} 
+                    onPress={() => handleMenuToggle(item._id)}
+                  >
+                    <Animated.View style={{
+                      transform: [{
+                        rotate: expandedStaffId === item._id ? '180deg' : '0deg'
+                      }]
+                    }}>
+                      <Ionicons name="chevron-down" size={20} color={expandedStaffId === item._id ? ACCENT : "#b0b3b8"} />
+                    </Animated.View>
                   </Pressable>
                 </View>
                 {/* Bottom Row: Phone */}
@@ -128,6 +164,27 @@ export default function StaffsScreen() {
                   <Text style={styles.infoLabel}>Phone</Text>
                   <Text style={styles.infoValue}>{item.phone}</Text>
                 </View>
+                
+                {/* Animated Action Menu */}
+                {expandedStaffId === item._id && (
+                  <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
+                    <Pressable 
+                      style={[styles.actionButton, styles.editButton]} 
+                      onPress={() => handleEditStaff(item)}
+                    >
+                      <Ionicons name="pencil" size={18} color="#3D5AFE" />
+                      <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit Staff</Text>
+                    </Pressable>
+                    
+                    <Pressable 
+                      style={[styles.actionButton, styles.deleteButton]} 
+                      onPress={() => handleDeleteStaff(item)}
+                    >
+                      <Ionicons name="trash" size={18} color="#e53935" />
+                      <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete Staff</Text>
+                    </Pressable>
+                  </Animated.View>
+                )}
               </View>
             )}
             ListEmptyComponent={() => (
@@ -136,23 +193,6 @@ export default function StaffsScreen() {
               </View>
             )}
           />
-          {/* Menu Modal */}
-          <Modal
-            visible={!!menuStaff}
-            transparent
-            animationType="fade"
-            onRequestClose={closeMenu}
-          >
-            <Pressable style={styles.menuOverlay} onPress={closeMenu} />
-            <View style={styles.menuSheetBottom}>
-              <Pressable style={styles.menuItem} onPress={handleEditStaff}>
-                <Text style={styles.menuItemText}>Edit Staff</Text>
-              </Pressable>
-              <Pressable style={[styles.menuItem, { borderTopWidth: 1, borderTopColor: '#eee', marginTop: 6 }]} onPress={handleDeleteStaff}>
-                <Text style={[styles.menuItemText, { color: '#e53935', fontWeight: '700' }]}>Delete Staff</Text>
-              </Pressable>
-            </View>
-          </Modal>
         </>
       )}
     </View>
@@ -274,39 +314,51 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   menuIconBtn: {
-    padding: 6,
+    padding: 8,
     borderRadius: androidUI.borderRadius.large,
     backgroundColor: '#f3f6fa',
     marginLeft: androidUI.spacing.sm,
+    transition: 'all 0.2s ease',
   },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
+  menuIconBtnActive: {
+    backgroundColor: '#e3eaff',
+    transform: [{ scale: 1.05 }],
   },
-  menuSheetBottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
+  actionMenu: {
+    marginTop: androidUI.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: androidUI.spacing.md,
+    overflow: 'hidden',
   },
-  menuItem: {
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.sm,
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.md,
     borderRadius: androidUI.borderRadius.medium,
-    marginBottom: 6,
-    backgroundColor: '#f6f9fc',
-    shadowColor: 'transparent',
+    marginBottom: 8,
+    gap: 12,
   },
-  menuItemText: {
-    fontSize: 16,
+  editButton: {
+    backgroundColor: '#f0f7ff',
+    borderWidth: 1,
+    borderColor: '#e3eaff',
+  },
+  deleteButton: {
+    backgroundColor: '#fff5f5',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  actionButtonText: {
+    fontSize: 15,
     fontWeight: '600',
-    color: androidUI.colors.text.primary,
     fontFamily: androidUI.fontFamily.medium,
   },
-}); 
+  editButtonText: {
+    color: ACCENT,
+  },
+  deleteButtonText: {
+    color: '#e53935',
+  },
+});
