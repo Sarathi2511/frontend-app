@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, FlatList, StyleSheet, Platform } from 'react-native';
+import { View, Text, Pressable, FlatList, StyleSheet, Platform } from 'react-native';
+import { Modal, Portal, Button, Card, Title, Paragraph, Divider } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useNotifications } from '../contexts/NotificationContext';
 
@@ -46,10 +47,7 @@ const NotificationButton: React.FC = () => {
   };
 
   const renderNotification = ({ item }: { item: any }) => (
-    <Pressable
-      style={[styles.notificationItem, !item.read && styles.unreadNotification]}
-      onPress={() => markAsRead(item.id)}
-    >
+    <View style={styles.notificationItem}>
       <View style={styles.notificationIcon}>
         <Text style={styles.iconText}>{getNotificationIcon(item.type)}</Text>
       </View>
@@ -59,14 +57,17 @@ const NotificationButton: React.FC = () => {
         <Text style={styles.notificationTime}>{formatTime(item.timestamp)}</Text>
       </View>
       {!item.read && <View style={styles.unreadDot} />}
-    </Pressable>
+    </View>
   );
+
+  const hideModal = () => setModalVisible(false);
+  const showModal = () => setModalVisible(true);
 
   return (
     <>
       <Pressable
         style={styles.notificationButton}
-        onPress={() => setModalVisible(true)}
+        onPress={showModal}
       >
         <Ionicons name="notifications-outline" size={24} color={ACCENT} />
         {unreadCount > 0 && (
@@ -78,56 +79,81 @@ const NotificationButton: React.FC = () => {
         )}
       </Pressable>
 
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
+      <Portal>
+        <Modal
+          visible={modalVisible}
+          onDismiss={hideModal}
+          contentContainerStyle={styles.modalContainer}
+        >
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Notifications</Text>
-              <View style={styles.headerActions}>
-                <Pressable
-                  style={styles.headerButton}
-                  onPress={markAllAsRead}
-                >
-                  <Text style={styles.headerButtonText}>Mark all read</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.headerButton}
-                  onPress={clearNotifications}
-                >
-                  <Text style={styles.headerButtonText}>Clear all</Text>
-                </Pressable>
+            {/* Header Section */}
+            <View style={styles.headerSection}>
+              <View style={styles.headerRow}>
+                <Title style={styles.modalTitle}>Notifications</Title>
+                <View style={styles.headerActions}>
+                  <Button
+                    mode="contained"
+                    onPress={markAllAsRead}
+                    style={[styles.headerButton, { backgroundColor: ACCENT }]}
+                    labelStyle={styles.headerButtonText}
+                    compact
+                    buttonColor={ACCENT}
+                  >
+                    Mark As Read
+                  </Button>
+                  <Button
+                    mode="contained"
+                    onPress={clearNotifications}
+                    style={[styles.headerButton, { backgroundColor: ACCENT }]}
+                    labelStyle={styles.headerButtonText}
+                    compact
+                    buttonColor={ACCENT}
+                  >
+                    Clear All
+                  </Button>
+                </View>
               </View>
             </View>
             
-            <FlatList
-              data={notifications}
-              renderItem={renderNotification}
-              keyExtractor={item => item.id}
-              style={styles.notificationsList}
-              showsVerticalScrollIndicator={false}
-              ListEmptyComponent={
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyIcon}>🔔</Text>
-                  <Text style={styles.emptyTitle}>No notifications</Text>
-                  <Text style={styles.emptyMessage}>You're all caught up!</Text>
-                </View>
-              }
-            />
+            {/* Horizontal Rule */}
+            <View style={styles.horizontalRule} />
             
-            <Pressable
-              style={styles.closeButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </Pressable>
+            {/* Notifications Content */}
+            <View style={styles.notificationsSection}>
+              <FlatList
+                data={notifications}
+                renderItem={renderNotification}
+                keyExtractor={item => item.id}
+                style={styles.notificationsList}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyIcon}>🔔</Text>
+                    <Title style={styles.emptyTitle}>No notifications</Title>
+                    <Paragraph style={styles.emptyMessage}>You're all caught up!</Paragraph>
+                  </View>
+                }
+              />
+            </View>
+            
+            {/* Horizontal Rule */}
+            <View style={styles.horizontalRule} />
+            
+            {/* Footer Section */}
+            <View style={styles.footerSection}>
+              <Button
+                mode="contained"
+                onPress={hideModal}
+                style={[styles.closeButton, { backgroundColor: ACCENT }]}
+                labelStyle={styles.closeButtonText}
+                buttonColor={ACCENT}
+              >
+                Close
+              </Button>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </Portal>
     </>
   );
 };
@@ -155,64 +181,76 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  modalContainer: {
+    backgroundColor: 'white',
+    margin: 20,
+    borderRadius: 16,
+    maxHeight: '85%',
+    minHeight: '60%',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '50%',
+    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  modalHeader: {
+  headerSection: {
+    padding: 20,
+    paddingBottom: 16,
+  },
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#222',
+    color: '#1a1a1a',
   },
   headerActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   headerButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: ACCENT,
+    marginHorizontal: 2,
     borderRadius: 8,
   },
   headerButtonText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+    color: '#fff',
+  },
+  horizontalRule: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 0,
+  },
+  notificationsSection: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   notificationsList: {
     flex: 1,
   },
   notificationItem: {
     flexDirection: 'row',
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
-  },
-  unreadNotification: {
-    backgroundColor: '#f8f9ff',
+    backgroundColor: 'transparent',
   },
   notificationIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -226,13 +264,14 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#222',
+    color: '#1a1a1a',
     marginBottom: 4,
   },
   notificationMessage: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
+    lineHeight: 20,
   },
   notificationTime: {
     fontSize: 12,
@@ -249,6 +288,8 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 40,
+    flex: 1,
+    justifyContent: 'center',
   },
   emptyIcon: {
     fontSize: 48,
@@ -259,22 +300,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptyMessage: {
     fontSize: 14,
     color: '#999',
+    textAlign: 'center',
+  },
+  footerSection: {
+    padding: 20,
+    paddingTop: 16,
   },
   closeButton: {
-    backgroundColor: ACCENT,
-    margin: 20,
-    paddingVertical: 12,
     borderRadius: 12,
-    alignItems: 'center',
+    paddingVertical: 4,
   },
   closeButtonText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
 });
 
