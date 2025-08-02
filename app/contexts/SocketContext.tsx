@@ -31,6 +31,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [lastProductEvent, setLastProductEvent] = useState<any>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { addNotification } = useNotifications();
+  const BASE_URL = 'https://backend-app-1qf1.onrender.com';
+  // const BASE_URL = 'http://192.168.29.111:5000';
 
   const connect = async () => {
     try {
@@ -45,7 +47,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
 
       // Create new socket connection
-      const newSocket = io('https://backend-app-1qf1.onrender.com', {
+      const newSocket = io(BASE_URL, {
         auth: {
           token: token
         },
@@ -91,6 +93,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           message: `${data.product.name} was created by ${data.createdBy.name}`,
           timestamp: new Date()
         });
+        // Show toast for new product creation
+        // Toast notifications handled by individual components
       });
 
       newSocket.on('product:updated', (data) => {
@@ -123,6 +127,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
           message: `${data.staff.name} (${data.staff.role}) was created by ${data.createdBy.name}`,
           timestamp: new Date()
         });
+        // Show toast for new staff creation
+        // Toast notifications handled by individual components
       });
 
       newSocket.on('staff:updated', (data) => {

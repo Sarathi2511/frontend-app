@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "./contexts/SocketContext";
 import { androidUI } from "./utils/androidUI";
+import { useToast } from "./contexts/ToastContext";
 
 const { width, height } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
@@ -23,6 +24,7 @@ export default function LoginScreen() {
   const logoAnim = useState(new Animated.Value(0))[0];
   const buttonAnim = useRef(new Animated.Value(1)).current;
   const { connect } = useSocket();
+  const { showToast } = useToast();
 
   // Check if user is already logged in
   useEffect(() => {
@@ -50,7 +52,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!phone || !password) {
-      Alert.alert("Error", "Please enter phone number and password");
+      showToast('Please enter phone number and password', 'error');
       return;
     }
     // Animate button
@@ -76,17 +78,23 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('userName', data.name);
         if (data.userId) await AsyncStorage.setItem('userId', data.userId);
         
+        // Show success toast
+        showToast(`Welcome back, ${data.name}!`, 'success');
+        
         // Establish WebSocket connection after successful login
         // Small delay to ensure token is properly stored
         await new Promise(resolve => setTimeout(resolve, 100));
         await connect();
         
-        router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
+        // Navigate after a short delay to show the toast
+        setTimeout(() => {
+          router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
+        }, 1500);
       } else {
-        Alert.alert("Login Failed", "Invalid phone number or password");
+        showToast('Invalid phone number or password', 'error');
       }
     } catch (err) {
-      Alert.alert("Login Error", "Could not connect to server");
+      showToast('Could not connect to server', 'error');
     } finally {
       setLoading(false);
     }

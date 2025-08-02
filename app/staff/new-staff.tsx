@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Animated, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { createStaff } from "../api";
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
+import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 const roleOptions = ["Admin", "Staff", "Executive"];
@@ -24,9 +25,8 @@ export default function NewStaffScreen() {
   const [creating, setCreating] = useState(false);
   const chevronAnim = useState(new Animated.Value(0))[0];
   const [submitAnim] = useState(new Animated.Value(1));
-  const [showToast, setShowToast] = useState(false);
-  const toastAnim = useRef(new Animated.Value(0)).current;
   const isMounted = useRef(true);
+  const { showToast } = useToast();
 
   useEffect(() => {
     return () => { isMounted.current = false; };
@@ -60,7 +60,7 @@ export default function NewStaffScreen() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.role || !form.phone || !form.password) {
-      Alert.alert("Error", "Please fill all fields.");
+      showToast('Please fill all fields.', 'error');
       return;
     }
 
@@ -73,20 +73,14 @@ export default function NewStaffScreen() {
         password: form.password 
       });
       if (isMounted.current) {
-        setShowToast(true);
-        Animated.timing(toastAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }).start(() => {
-          setShowToast(false);
-          toastAnim.setValue(0);
-          // Navigate back to staff list instead of dashboard
+        showToast('Staff created successfully!', 'success');
+        // Navigate after showing toast
+        setTimeout(() => {
           router.replace('/staff');
-        });
+        }, 1500);
       }
     } catch (err) {
-      Alert.alert("Error", "Failed to create staff");
+      showToast('Failed to create staff', 'error');
     }
     setCreating(false);
   };
@@ -125,37 +119,53 @@ export default function NewStaffScreen() {
                   />
                 </View>
               </View>
-              <View style={styles.floatingLabelInputWrap}>
+              <View style={[styles.floatingLabelInputWrap, { position: 'relative' }]}>
                 <Text style={styles.floatingLabel}>Staff Role</Text>
-                <Pressable style={[styles.dropdownPicker, styles.inputRow]} onPress={openDropdown}>
+                <Pressable style={[styles.dropdownPicker, styles.inputRow]} onPress={roleDropdownOpen ? closeDropdown : openDropdown}>
                   <Ionicons name="briefcase-outline" size={20} color={ACCENT} style={styles.inputIcon} />
                   <Text style={styles.dropdownPickerText}>{form.role}</Text>
                   <Animated.View style={{ marginLeft: 8, transform: [{ rotate: chevronRotate }] }}>
                     <Ionicons name="chevron-down" size={18} color={ACCENT} />
                   </Animated.View>
                 </Pressable>
-                <Modal
-                  visible={roleDropdownOpen}
-                  transparent
-                  animationType="fade"
-                  onRequestClose={closeDropdown}
-                >
-                  <Pressable style={styles.modalOverlay} onPress={closeDropdown} />
-                  <View style={styles.pickerModalSheetCard}>
-                    <FlatList
-                      data={roleOptions}
-                      keyExtractor={item => item}
-                      renderItem={({ item }) => (
+                {roleDropdownOpen && (
+                  <>
+                    <Pressable 
+                      style={styles.dropdownOverlay} 
+                      onPress={closeDropdown}
+                    />
+                    <Animated.View
+                      style={[
+                        styles.inlineDropdown,
+                        {
+                          opacity: chevronAnim,
+                          transform: [
+                            { translateY: chevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                          ]
+                        }
+                      ]}
+                    >
+                      {roleOptions.map((item) => (
                         <Pressable
-                          style={({ pressed }) => [styles.pickerOptionCard, form.role === item && styles.pickerOptionSelected, pressed && { opacity: 0.7 }]}
+                          key={item}
+                          style={({ pressed }) => [
+                            styles.inlineDropdownOption,
+                            form.role === item && styles.inlineDropdownOptionSelected,
+                            pressed && { opacity: 0.7 }
+                          ]}
                           onPress={() => { handleChange('role', item); closeDropdown(); }}
                         >
-                          <Text style={[styles.pickerOptionText, form.role === item && styles.pickerOptionTextSelected]}>{item}</Text>
+                          <Text style={[
+                            styles.inlineDropdownOptionText,
+                            form.role === item && styles.inlineDropdownOptionTextSelected
+                          ]}>
+                            {item}
+                          </Text>
                         </Pressable>
-                      )}
-                    />
-                  </View>
-                </Modal>
+                      ))}
+                    </Animated.View>
+                  </>
+                )}
               </View>
               <View style={styles.floatingLabelInputWrap}>
                 <Text style={styles.floatingLabel}>Staff Phone No</Text>
@@ -207,22 +217,6 @@ export default function NewStaffScreen() {
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-      {showToast && (
-        <Animated.View
-          style={[
-            styles.toast,
-            {
-              opacity: toastAnim,
-              transform: [
-                { translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }
-              ]
-            }
-          ]}
-          pointerEvents="none"
-        >
-          <Text style={styles.toastText}>🎉 Staff Created Successfully!</Text>
-        </Animated.View>
-      )}
     </SafeAreaView>
   );
 }
@@ -443,5 +437,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 16,
     textAlign: 'center',
+  },
+  inlineDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    ...androidUI.cardShadow,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    zIndex: 1000,
+    elevation: 10,
+  },
+  inlineDropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  inlineDropdownOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  inlineDropdownOptionText: {
+    color: androidUI.colors.text.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  inlineDropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 999,
   },
 }); 

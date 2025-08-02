@@ -1,12 +1,13 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, SafeAreaView, Alert, Animated } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, SafeAreaView, Animated } from "react-native";
 import { createProduct } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
+import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 const dimensionOptions = [
@@ -43,6 +44,7 @@ export default function NewProductScreen() {
   const [dimensionDropdownOpen, setDimensionDropdownOpen] = useState(false);
   const [dropdownAnim] = useState(new Animated.Value(0));
   const [submitAnim] = useState(new Animated.Value(1));
+  const { showToast } = useToast();
 
   const handleChange = (field: string, value: any) => {
     setForm({ ...form, [field]: value });
@@ -63,6 +65,10 @@ export default function NewProductScreen() {
       useNativeDriver: true,
     }).start(() => setDimensionDropdownOpen(false));
   };
+  const chevronRotate = dropdownAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   const handleSubmit = async () => {
     // Validate required fields
@@ -74,7 +80,7 @@ export default function NewProductScreen() {
     ];
     const emptyField = requiredFields.find(f => f.value === '' || f.value === undefined || f.value === null);
     if (emptyField) {
-      Alert.alert("Error", `Please fill in the ${emptyField.label}.`);
+      showToast(`Please fill in the ${emptyField.label}.`, 'error');
       return;
     }
     const productData = {
@@ -85,14 +91,17 @@ export default function NewProductScreen() {
     };
     try {
       await createProduct(productData);
-      Alert.alert("Success", "Product created successfully!");
-      if (params.returnTo === 'orderitems') {
-        router.replace({ pathname: '/orders/orderitems', params: { productName: form.name } });
-      } else {
-        router.back();
-      }
+      showToast('Product created successfully!', 'success');
+      // Navigate after showing toast
+      setTimeout(() => {
+        if (params.returnTo === 'orderitems') {
+          router.replace({ pathname: '/orders/orderitems', params: { productName: form.name } });
+        } else {
+          router.back();
+        }
+      }, 1500);
     } catch (err) {
-      Alert.alert("Error", "Failed to create product");
+      showToast('Failed to create product', 'error');
     }
   };
 
@@ -138,46 +147,60 @@ export default function NewProductScreen() {
                   />
                 </View>
               </View>
-              <View style={styles.floatingLabelInputWrap}>
+              <View style={[styles.floatingLabelInputWrap, { position: 'relative' }]}>
                 <Text style={styles.floatingLabel}>Dimension</Text>
-                <Pressable style={[styles.dropdownPicker, styles.inputRow]} onPress={openDropdown}>
+                <Pressable style={[styles.dropdownPicker, styles.inputRow]} onPress={dimensionDropdownOpen ? closeDropdown : openDropdown}>
                   <Text style={styles.inputIcon}>📐</Text>
                   <Text style={styles.dropdownPickerText}>{form.dimension}</Text>
-                  <Ionicons name="chevron-down" size={18} color={ACCENT} style={{ marginLeft: 8 }} />
-                </Pressable>
-                <Modal
-                  visible={dimensionDropdownOpen}
-                  transparent
-                  animationType="none"
-                  onRequestClose={closeDropdown}
-                >
-                  <Pressable style={styles.modalOverlay} onPress={closeDropdown} />
-                  <Animated.View
-                    style={[
-                      styles.pickerModalSheetCard,
-                      {
-                        opacity: dropdownAnim,
-                        transform: [
-                          { translateY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }
-                        ]
-                      }
-                    ]}
-                  >
-                    <FlatList
-                      data={dimensionOptions}
-                      keyExtractor={item => item}
-                      renderItem={({ item }) => (
-                        <Pressable
-                          style={({ pressed }) => [styles.pickerOptionCard, form.dimension === item && styles.pickerOptionSelected, pressed && { opacity: 0.7 }]}
-                          onPress={() => { handleChange('dimension', item); closeDropdown(); }}
-                        >
-                          <Text style={styles.pickerOptionIcon}>{dimensionIcons[item] || '📦'}</Text>
-                          <Text style={[styles.pickerOptionText, form.dimension === item && styles.pickerOptionTextSelected]}>{item}</Text>
-                        </Pressable>
-                      )}
-                    />
+                  <Animated.View style={{ marginLeft: 8, transform: [{ rotate: chevronRotate }] }}>
+                    <Ionicons name="chevron-down" size={18} color={ACCENT} />
                   </Animated.View>
-                </Modal>
+                </Pressable>
+                {dimensionDropdownOpen && (
+                  <>
+                    <Pressable 
+                      style={styles.dropdownOverlay} 
+                      onPress={closeDropdown}
+                    />
+                    <Animated.View
+                      style={[
+                        styles.inlineDropdown,
+                        {
+                          opacity: dropdownAnim,
+                          transform: [
+                            { translateY: dropdownAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                          ]
+                        }
+                      ]}
+                    >
+                      <ScrollView 
+                        style={styles.dropdownScrollView}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {dimensionOptions.map((item) => (
+                          <Pressable
+                            key={item}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              form.dimension === item && styles.inlineDropdownOptionSelected,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => { handleChange('dimension', item); closeDropdown(); }}
+                          >
+                            <Text style={styles.inlineDropdownOptionIcon}>{dimensionIcons[item] || '📦'}</Text>
+                            <Text style={[
+                              styles.inlineDropdownOptionText,
+                              form.dimension === item && styles.inlineDropdownOptionTextSelected
+                            ]}>
+                              {item}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </Animated.View>
+                  </>
+                )}
               </View>
               <View style={styles.floatingLabelInputWrap}>
                 <Text style={styles.floatingLabel}>Low Stock Threshold Value</Text>
@@ -432,5 +455,59 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontWeight: '700',
     fontSize: 15,
+  },
+  inlineDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    ...androidUI.cardShadow,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    zIndex: 1000,
+    elevation: 10,
+  },
+  inlineDropdownOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  inlineDropdownOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  inlineDropdownOptionIcon: {
+    fontSize: 20,
+    marginRight: 12,
+  },
+  inlineDropdownOptionText: {
+    color: androidUI.colors.text.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  inlineDropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 999,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
   },
 }); 
