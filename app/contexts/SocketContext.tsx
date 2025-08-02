@@ -45,7 +45,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       }
 
       // Create new socket connection
-      const newSocket = io('http://192.168.29.111:5000', {
+      const newSocket = io('https://backend-app-1qf1.onrender.com', {
         auth: {
           token: token
         },
