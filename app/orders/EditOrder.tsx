@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
 import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
@@ -41,6 +41,11 @@ export default function EditOrderScreen() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [assignedDropdownOpen, setAssignedDropdownOpen] = useState(false);
   const [deliveryPartnerDropdownOpen, setDeliveryPartnerDropdownOpen] = useState(false);
+  
+  // Animation values for inline dropdowns
+  const [statusChevronAnim] = useState(new Animated.Value(0));
+  const [assignedChevronAnim] = useState(new Animated.Value(0));
+  const [deliveryPartnerChevronAnim] = useState(new Animated.Value(0));
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(true);
@@ -108,6 +113,69 @@ export default function EditOrderScreen() {
     }
   }, [id]);
 
+  // Dropdown animation interpolations
+  const statusChevronRotate = statusChevronAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+  const assignedChevronRotate = assignedChevronAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+  const deliveryPartnerChevronRotate = deliveryPartnerChevronAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+
+  // Dropdown open/close functions
+  const openStatusDropdown = () => {
+    setStatusDropdownOpen(true);
+    Animated.timing(statusChevronAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const closeStatusDropdown = () => {
+    Animated.timing(statusChevronAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setStatusDropdownOpen(false));
+  };
+
+  const openAssignedDropdown = () => {
+    setAssignedDropdownOpen(true);
+    Animated.timing(assignedChevronAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const closeAssignedDropdown = () => {
+    Animated.timing(assignedChevronAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setAssignedDropdownOpen(false));
+  };
+
+  const openDeliveryPartnerDropdown = () => {
+    setDeliveryPartnerDropdownOpen(true);
+    Animated.timing(deliveryPartnerChevronAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const closeDeliveryPartnerDropdown = () => {
+    Animated.timing(deliveryPartnerChevronAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setDeliveryPartnerDropdownOpen(false));
+  };
+
   // Handle status change with delivery partner validation
   const handleStatusChange = (newStatus: string) => {
     if (newStatus === 'Dispatched' && !form.deliveryPartner) {
@@ -118,11 +186,11 @@ export default function EditOrderScreen() {
           { text: "OK" }
         ]
       );
-      setDeliveryPartnerDropdownOpen(true);
+      openDeliveryPartnerDropdown();
       return;
     }
     setForm(prev => ({ ...prev, orderStatus: newStatus }));
-    setStatusDropdownOpen(false);
+    closeStatusDropdown();
   };
 
   // Fetch products when product modal opens
@@ -349,86 +417,130 @@ export default function EditOrderScreen() {
           {/* Assignment & Status */}
           <View style={styles.sectionGroup}>
             {/* Order Status Dropdown */}
-            <View style={styles.floatingLabelInputWrap}>
+            <View style={[styles.floatingLabelInputWrap, { position: 'relative' }]}>
               <Text style={styles.floatingLabel}>Order Status</Text>
-              <Pressable style={styles.dropdownPicker} onPress={() => setStatusDropdownOpen(true)}>
+              <Pressable style={[styles.dropdownPicker, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={statusDropdownOpen ? closeStatusDropdown : openStatusDropdown}>
+                <Text style={styles.inputIcon}>📋</Text>
                 <Text style={styles.dropdownPickerText}>{form.orderStatus}</Text>
-                <Ionicons name="chevron-down" size={18} color={ACCENT} style={{ marginLeft: 8 }} />
+                <Animated.View style={{ marginLeft: 8, transform: [{ rotate: statusChevronRotate }] }}>
+                  <Ionicons name="chevron-down" size={18} color={ACCENT} />
+                </Animated.View>
               </Pressable>
-              <Modal
-                visible={statusDropdownOpen}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setStatusDropdownOpen(false)}
-              >
-                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setStatusDropdownOpen(false)} />
-                <View style={styles.pickerModalSheet}>
-                  <FlatList
-                    data={getValidNextStatuses(form.orderStatus)}
-                    keyExtractor={item => item}
-                    renderItem={({ item }) => (
+              {statusDropdownOpen && (
+                <>
+                  <Pressable 
+                    style={styles.dropdownOverlay} 
+                    onPress={closeStatusDropdown}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.inlineDropdown,
+                      {
+                        opacity: statusChevronAnim,
+                        transform: [
+                          { translateY: statusChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                        ]
+                      }
+                    ]}
+                  >
+                    {getValidNextStatuses(form.orderStatus).map((item) => (
                       <Pressable
-                        style={({ pressed }) => [styles.pickerOption, form.orderStatus === item && styles.pickerOptionSelected, pressed && { opacity: 0.7 }]}
+                        key={item}
+                        style={({ pressed }) => [
+                          styles.inlineDropdownOption,
+                          form.orderStatus === item && styles.inlineDropdownOptionSelected,
+                          pressed && { opacity: 0.7 }
+                        ]}
                         onPress={() => handleStatusChange(item)}
                       >
-                        <Text style={[styles.pickerOptionText, form.orderStatus === item && styles.pickerOptionTextSelected]}>{item}</Text>
+                        <Text style={[
+                          styles.inlineDropdownOptionText,
+                          form.orderStatus === item && styles.inlineDropdownOptionTextSelected
+                        ]}>
+                          {item}
+                        </Text>
                       </Pressable>
-                    )}
-                    ListEmptyComponent={() => (
+                    ))}
+                    {getValidNextStatuses(form.orderStatus).length === 0 && (
                       <View style={{ padding: 16, alignItems: 'center' }}>
                         <Text style={{ color: '#666', fontSize: 14, textAlign: 'center' }}>
                           No further status changes allowed
                         </Text>
                       </View>
                     )}
-                  />
-                </View>
-              </Modal>
+                  </Animated.View>
+                </>
+              )}
             </View>
 
             {/* Assigned To Dropdown */}
-            <View style={styles.floatingLabelInputWrap}>
+            <View style={[styles.floatingLabelInputWrap, { position: 'relative' }]}>
               <Text style={styles.floatingLabel}>Assigned To</Text>
               {loadingStaff ? (
                 <ActivityIndicator size="small" color={ACCENT} />
               ) : (
                 <>
-                  <Pressable style={styles.dropdownPicker} onPress={() => setAssignedDropdownOpen(true)}>
+                  <Pressable style={[styles.dropdownPicker, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={assignedDropdownOpen ? closeAssignedDropdown : openAssignedDropdown}>
+                    <Text style={styles.inputIcon}>👤</Text>
                     <Text style={styles.dropdownPickerText}>{form.assignedTo}</Text>
-                    <Ionicons name="chevron-down" size={18} color={ACCENT} style={{ marginLeft: 8 }} />
+                    <Animated.View style={{ marginLeft: 8, transform: [{ rotate: assignedChevronRotate }] }}>
+                      <Ionicons name="chevron-down" size={18} color={ACCENT} />
+                    </Animated.View>
                   </Pressable>
-                  <Modal
-                    visible={assignedDropdownOpen}
-                    transparent
-                    animationType="fade"
-                    onRequestClose={() => setAssignedDropdownOpen(false)}
-                  >
-                    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setAssignedDropdownOpen(false)} />
-                    <View style={styles.pickerModalSheet}>
-                      <FlatList
-                        data={staffList}
-                        keyExtractor={item => item._id}
-                        renderItem={({ item }) => (
-                          <Pressable
-                            style={({ pressed }) => [styles.pickerOption, form.assignedToId === item._id && styles.pickerOptionSelected, pressed && { opacity: 0.7 }]}
-                            onPress={() => {
-                              setForm(f => ({ ...f, assignedTo: item.name, assignedToId: item._id }));
-                              setAssignedDropdownOpen(false);
-                            }}
-                          >
-                            <Text style={[styles.pickerOptionText, form.assignedToId === item._id && styles.pickerOptionTextSelected]}>{item.name}</Text>
-                          </Pressable>
-                        )}
+                  {assignedDropdownOpen && (
+                    <>
+                      <Pressable 
+                        style={styles.dropdownOverlay} 
+                        onPress={closeAssignedDropdown}
                       />
-                    </View>
-                  </Modal>
+                      <Animated.View
+                        style={[
+                          styles.inlineDropdown,
+                          {
+                            opacity: assignedChevronAnim,
+                            transform: [
+                              { translateY: assignedChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                            ]
+                          }
+                        ]}
+                      >
+                        <ScrollView 
+                          style={styles.dropdownScrollView}
+                          showsVerticalScrollIndicator={false}
+                          nestedScrollEnabled={true}
+                        >
+                          {staffList.map((item) => (
+                            <Pressable
+                              key={item._id}
+                              style={({ pressed }) => [
+                                styles.inlineDropdownOption,
+                                form.assignedToId === item._id && styles.inlineDropdownOptionSelected,
+                                pressed && { opacity: 0.7 }
+                              ]}
+                              onPress={() => {
+                                setForm(f => ({ ...f, assignedTo: item.name, assignedToId: item._id }));
+                                closeAssignedDropdown();
+                              }}
+                            >
+                              <Text style={[
+                                styles.inlineDropdownOptionText,
+                                form.assignedToId === item._id && styles.inlineDropdownOptionTextSelected
+                              ]}>
+                                {item.name}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </ScrollView>
+                      </Animated.View>
+                    </>
+                  )}
                 </>
               )}
             </View>
 
             {/* Delivery Partner Dropdown */}
             {form.orderStatus === 'Dispatched' && (
-              <View style={styles.floatingLabelInputWrap}>
+              <View style={[styles.floatingLabelInputWrap, { position: 'relative' }]}>
                 <Text style={styles.floatingLabel}>Delivery Partner</Text>
                 {loadingStaff ? (
                   <ActivityIndicator size="small" color={ACCENT} />
@@ -437,40 +549,67 @@ export default function EditOrderScreen() {
                     <Pressable 
                       style={[
                         styles.dropdownPicker,
+                        styles.inputRow,
+                        styles.dropdownPickerEmphasis,
                         form.orderStatus === 'Dispatched' && !form.deliveryPartner && styles.dropdownPickerRequired
                       ]} 
-                      onPress={() => setDeliveryPartnerDropdownOpen(true)}
+                      onPress={deliveryPartnerDropdownOpen ? closeDeliveryPartnerDropdown : openDeliveryPartnerDropdown}
                     >
+                      <Text style={styles.inputIcon}>🚚</Text>
                       <Text style={styles.dropdownPickerText}>
                         {form.deliveryPartner || 'Select Delivery Partner'}
                       </Text>
-                      <Ionicons name="chevron-down" size={18} color={ACCENT} style={{ marginLeft: 8 }} />
+                      <Animated.View style={{ marginLeft: 8, transform: [{ rotate: deliveryPartnerChevronRotate }] }}>
+                        <Ionicons name="chevron-down" size={18} color={ACCENT} />
+                      </Animated.View>
                     </Pressable>
-                    <Modal
-                      visible={deliveryPartnerDropdownOpen}
-                      transparent
-                      animationType="fade"
-                      onRequestClose={() => setDeliveryPartnerDropdownOpen(false)}
-                    >
-                      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setDeliveryPartnerDropdownOpen(false)} />
-                      <View style={styles.pickerModalSheet}>
-                        <FlatList
-                          data={staffList.map(s => s.name)}
-                          keyExtractor={item => item}
-                          renderItem={({ item }) => (
-                            <Pressable
-                              style={({ pressed }) => [styles.pickerOption, form.deliveryPartner === item && styles.pickerOptionSelected, pressed && { opacity: 0.7 }]}
-                              onPress={() => {
-                                setForm(f => ({ ...f, deliveryPartner: item }));
-                                setDeliveryPartnerDropdownOpen(false);
-                              }}
-                            >
-                              <Text style={[styles.pickerOptionText, form.deliveryPartner === item && styles.pickerOptionTextSelected]}>{item}</Text>
-                            </Pressable>
-                          )}
+                    {deliveryPartnerDropdownOpen && (
+                      <>
+                        <Pressable 
+                          style={styles.dropdownOverlay} 
+                          onPress={closeDeliveryPartnerDropdown}
                         />
-                      </View>
-                    </Modal>
+                        <Animated.View
+                          style={[
+                            styles.inlineDropdown,
+                            {
+                              opacity: deliveryPartnerChevronAnim,
+                              transform: [
+                                { translateY: deliveryPartnerChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                              ]
+                            }
+                          ]}
+                        >
+                          <ScrollView 
+                            style={styles.dropdownScrollView}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
+                          >
+                            {staffList.map((item) => (
+                              <Pressable
+                                key={item._id}
+                                style={({ pressed }) => [
+                                  styles.inlineDropdownOption,
+                                  form.deliveryPartner === item.name && styles.inlineDropdownOptionSelected,
+                                  pressed && { opacity: 0.7 }
+                                ]}
+                                onPress={() => {
+                                  setForm(f => ({ ...f, deliveryPartner: item.name }));
+                                  closeDeliveryPartnerDropdown();
+                                }}
+                              >
+                                <Text style={[
+                                  styles.inlineDropdownOptionText,
+                                  form.deliveryPartner === item.name && styles.inlineDropdownOptionTextSelected
+                                ]}>
+                                  {item.name}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </Animated.View>
+                      </>
+                    )}
                   </>
                 )}
               </View>
@@ -1134,5 +1273,70 @@ const styles = StyleSheet.create({
   dropdownPickerRequired: {
     borderColor: '#ff5252',
     borderWidth: 1,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputIcon: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  dropdownPickerEmphasis: {
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  inlineDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    ...androidUI.cardShadow,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    zIndex: 1000,
+    elevation: 10,
+  },
+  inlineDropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  inlineDropdownOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  inlineDropdownOptionText: {
+    color: androidUI.colors.text.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  inlineDropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 999,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
   },
 }); 

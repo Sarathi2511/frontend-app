@@ -529,6 +529,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
+    maxHeight: 150,
+    minHeight: 50,
   },
   dropdownItemLabel: {
     fontSize: 15,
@@ -630,6 +633,167 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  // Centered Modal Styles
+  centeredModalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  centeredModalContent: {
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.xxlarge,
+    padding: androidUI.spacing.xxl,
+    width: '90%',
+    maxWidth: 400,
+    ...androidUI.modalShadow,
+    alignSelf: 'center',
+  },
+  centeredModalTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: androidUI.colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 24,
+    fontFamily: androidUI.fontFamily.medium,
+  },
+  centeredModalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    marginBottom: 8,
+    fontFamily: androidUI.fontFamily.medium,
+  },
+  centeredDropdownButton: {
+    backgroundColor: '#f3f6fa',
+    borderColor: '#e3e9f9',
+    borderRadius: androidUI.borderRadius.medium,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    height: 45,
+  },
+  centeredDropdownButtonText: {
+    fontSize: 15,
+    color: androidUI.colors.text.primary,
+    fontFamily: androidUI.fontFamily.regular,
+  },
+  centeredDropdownList: {
+    backgroundColor: '#fff',
+    borderColor: '#e3e9f9',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    position: 'relative',
+    maxHeight: 150,
+    minHeight: 50,
+  },
+  centeredDropdownItemLabel: {
+    fontSize: 15,
+    color: androidUI.colors.text.primary,
+    fontFamily: androidUI.fontFamily.regular,
+  },
+  centeredDropdownSelectedLabel: {
+    color: ACCENT,
+    fontWeight: '600',
+    fontFamily: androidUI.fontFamily.medium,
+  },
+  centeredDropdownPlaceholder: {
+    color: '#b0b3b8',
+    fontSize: 15,
+    fontFamily: androidUI.fontFamily.regular,
+  },
+  centeredModalButton: {
+    backgroundColor: ACCENT,
+    borderRadius: androidUI.borderRadius.large,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    ...androidUI.cardShadow,
+    shadowColor: ACCENT,
+  },
+  centeredModalButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: androidUI.fontFamily.medium,
+  },
+  // Inline dropdown styles for centered modal
+  centeredDropdownWrap: {
+    position: 'relative',
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  inputIcon: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  dropdownPickerEmphasis: {
+    borderWidth: 1.5,
+    borderColor: ACCENT,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  inlineDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    ...androidUI.cardShadow,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    zIndex: 1000,
+    elevation: 10,
+  },
+  inlineDropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  inlineDropdownOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  inlineDropdownOptionText: {
+    color: androidUI.colors.text.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  inlineDropdownOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 999,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
 });
 
 function getStatusStyle(status: string) {
@@ -686,6 +850,10 @@ export default function OrdersScreen() {
   const [selectedMarkedBy, setSelectedMarkedBy] = useState<string | null>(null);
   const [selectedRecievedBy, setSelectedRecievedBy] = useState<string | null>(null);
   const [paymentOrder, setPaymentOrder] = useState<any>(null);
+  
+  // Animation values for inline dropdowns
+  const [markedByChevronAnim] = useState(new Animated.Value(0));
+  const [receivedByChevronAnim] = useState(new Animated.Value(0));
   
   // Inline dropdown state
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
@@ -843,6 +1011,49 @@ export default function OrdersScreen() {
     closeMenu();
     router.push({ pathname: '/orders/EditOrder', params: { id: menuOrder.orderId, role } });
   };
+  // Dropdown animation interpolations
+  const markedByChevronRotate = markedByChevronAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+  const receivedByChevronRotate = receivedByChevronAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg']
+  });
+
+  // Dropdown open/close functions
+  const openMarkedByDropdownFunc = () => {
+    setOpenMarkedByDropdown(true);
+    Animated.timing(markedByChevronAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const closeMarkedByDropdown = () => {
+    Animated.timing(markedByChevronAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setOpenMarkedByDropdown(false));
+  };
+
+  const openReceivedByDropdownFunc = () => {
+    setOpenRecievedByDropdown(true);
+    Animated.timing(receivedByChevronAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  };
+  const closeReceivedByDropdown = () => {
+    Animated.timing(receivedByChevronAnim, {
+      toValue: 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start(() => setOpenRecievedByDropdown(false));
+  };
+
   const handleMarkPaid = async () => {
     closeMenu();
     if (staffList.length === 0 && !staffLoading && !staffError) {
@@ -1287,60 +1498,142 @@ export default function OrdersScreen() {
           onRequestClose={() => setShowPaymentModal(false)}
         >
           <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowPaymentModal(false)} />
-          <View style={[styles.menuSheet, { minHeight: 260 }]}> 
-            <Text style={[styles.menuItemText, { fontSize: 18, marginBottom: 18 }]}>Mark as Paid</Text>
-            
-            <Text style={{ marginBottom: 8, fontWeight: '600' }}>Payment Marked By</Text>
-            <View style={{ zIndex: 1000 }}>
-              <DropDownPicker
-                loading={staffLoading}
-                items={staffDropdownItems}
-                open={openMarkedByDropdown}
-                value={selectedMarkedBy}
-                setOpen={setOpenMarkedByDropdown}
-                setValue={setSelectedMarkedBy}
-                placeholder="Select Staff Member"
-                style={styles.dropdownButton}
-                textStyle={styles.dropdownButtonText}
-                dropDownContainerStyle={styles.dropdownList}
-                listItemLabelStyle={styles.dropdownItemLabel}
-                selectedItemLabelStyle={styles.dropdownSelectedLabel}
-                placeholderStyle={styles.dropdownPlaceholder}
-                searchable={false}
-                listMode="SCROLLVIEW"
-                scrollViewProps={{ nestedScrollEnabled: true }}
-              />
-            </View>
+          <View style={styles.centeredModalContainer}>
+            <View style={styles.centeredModalContent}>
+              <Text style={styles.centeredModalTitle}>Mark as Paid</Text>
+              
+              <Text style={styles.centeredModalLabel}>Payment Marked By</Text>
+              <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: 10000, marginBottom: 16 }]}>
+                <Pressable style={[styles.centeredDropdownButton, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={openMarkedByDropdown ? closeMarkedByDropdown : openMarkedByDropdownFunc}>
+                  <Text style={styles.inputIcon}>👤</Text>
+                  <Text style={styles.centeredDropdownButtonText}>
+                    {selectedMarkedBy || 'Select Staff Member'}
+                  </Text>
+                  <Animated.View style={{ marginLeft: 8, transform: [{ rotate: markedByChevronRotate }] }}>
+                    <Ionicons name="chevron-down" size={18} color={ACCENT} />
+                  </Animated.View>
+                </Pressable>
+                {openMarkedByDropdown && (
+                  <>
+                                      <Pressable 
+                    style={[styles.dropdownOverlay, { zIndex: 9999 }]} 
+                    onPress={closeMarkedByDropdown}
+                  />
+                    <Animated.View
+                      style={[
+                        styles.inlineDropdown,
+                        {
+                          opacity: markedByChevronAnim,
+                          transform: [
+                            { translateY: markedByChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                          ],
+                          zIndex: 10000
+                        }
+                      ]}
+                    >
+                      <ScrollView 
+                        style={styles.dropdownScrollView}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {staffList.map((item) => (
+                          <Pressable
+                            key={item._id}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              selectedMarkedBy === item.name && styles.inlineDropdownOptionSelected,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => {
+                              setSelectedMarkedBy(item.name);
+                              closeMarkedByDropdown();
+                            }}
+                          >
+                            <Text style={[
+                              styles.inlineDropdownOptionText,
+                              selectedMarkedBy === item.name && styles.inlineDropdownOptionTextSelected
+                            ]}>
+                              {item.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </Animated.View>
+                  </>
+                )}
+              </View>
 
-            <Text style={{ marginBottom: 8, marginTop: 16, fontWeight: '600' }}>Payment Recieved By</Text>
-            <View style={{ zIndex: 999 }}>
-              <DropDownPicker
-                loading={staffLoading}
-                items={staffDropdownItems}
-                open={openRecievedByDropdown}
-                value={selectedRecievedBy}
-                setOpen={setOpenRecievedByDropdown}
-                setValue={setSelectedRecievedBy}
-                placeholder="Select Staff Member"
-                style={styles.dropdownButton}
-                textStyle={styles.dropdownButtonText}
-                dropDownContainerStyle={styles.dropdownList}
-                listItemLabelStyle={styles.dropdownItemLabel}
-                selectedItemLabelStyle={styles.dropdownSelectedLabel}
-                placeholderStyle={styles.dropdownPlaceholder}
-                searchable={false}
-                listMode="SCROLLVIEW"
-                scrollViewProps={{ nestedScrollEnabled: true }}
-              />
-            </View>
+                          <Text style={styles.centeredModalLabel}>Payment Received By</Text>
+            <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: 10001, marginBottom: 24, marginTop: openMarkedByDropdown ? 120 : 0 }]}>
+                <Pressable style={[styles.centeredDropdownButton, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={openRecievedByDropdown ? closeReceivedByDropdown : openReceivedByDropdownFunc}>
+                  <Text style={styles.inputIcon}>👤</Text>
+                  <Text style={styles.centeredDropdownButtonText}>
+                    {selectedRecievedBy || 'Select Staff Member'}
+                  </Text>
+                  <Animated.View style={{ marginLeft: 8, transform: [{ rotate: receivedByChevronRotate }] }}>
+                    <Ionicons name="chevron-down" size={18} color={ACCENT} />
+                  </Animated.View>
+                </Pressable>
+                {openRecievedByDropdown && (
+                  <>
+                                      <Pressable 
+                    style={[styles.dropdownOverlay, { zIndex: 9999 }]} 
+                    onPress={closeReceivedByDropdown}
+                  />
+                    <Animated.View
+                      style={[
+                        styles.inlineDropdown,
+                        {
+                          opacity: receivedByChevronAnim,
+                          transform: [
+                            { translateY: receivedByChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
+                          ],
+                          zIndex: 10001
+                        }
+                      ]}
+                    >
+                      <ScrollView 
+                        style={styles.dropdownScrollView}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {staffList.map((item) => (
+                          <Pressable
+                            key={item._id}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              selectedRecievedBy === item.name && styles.inlineDropdownOptionSelected,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => {
+                              setSelectedRecievedBy(item.name);
+                              closeReceivedByDropdown();
+                            }}
+                          >
+                            <Text style={[
+                              styles.inlineDropdownOptionText,
+                              selectedRecievedBy === item.name && styles.inlineDropdownOptionTextSelected
+                            ]}>
+                              {item.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </Animated.View>
+                  </>
+                )}
+              </View>
 
-            <Pressable
-              style={[styles.menuItem, { backgroundColor: selectedMarkedBy && selectedRecievedBy ? ACCENT : '#eee', marginTop: 24 }]}
-              onPress={selectedMarkedBy && selectedRecievedBy ? handlePaymentSubmit : undefined}
-              disabled={!(selectedMarkedBy && selectedRecievedBy)}
-            >
-              <Text style={[styles.menuItemText, { color: selectedMarkedBy && selectedRecievedBy ? '#fff' : '#b0b3b8', textAlign: 'center' }]}>Mark as Paid</Text>
-            </Pressable>
+              <Pressable
+                style={[styles.centeredModalButton, { backgroundColor: selectedMarkedBy && selectedRecievedBy ? ACCENT : '#eee' }]}
+                onPress={selectedMarkedBy && selectedRecievedBy ? handlePaymentSubmit : undefined}
+                disabled={!(selectedMarkedBy && selectedRecievedBy)}
+              >
+                <Text style={[styles.centeredModalButtonText, { color: selectedMarkedBy && selectedRecievedBy ? '#fff' : '#b0b3b8' }]}>
+                  Mark as Paid
+                </Text>
+              </Pressable>
+            </View>
           </View>
         </Modal>
         </>
