@@ -80,6 +80,8 @@ const Toast: React.FC<ToastProps> = ({
 
   if (!visible) return null;
 
+  console.log('Toast rendering:', { visible, message, type }); // Debug log
+
   return (
     <Animated.View
       style={[
@@ -106,10 +108,10 @@ const Toast: React.FC<ToastProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: 60,
+    top: 120, // Increased to avoid header overlap
     left: 20,
     right: 20,
-    zIndex: 1000,
+    zIndex: 9999, // Increased zIndex to ensure it's on top
   },
   toast: {
     flexDirection: 'row',

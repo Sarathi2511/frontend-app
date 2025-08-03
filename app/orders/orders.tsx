@@ -8,10 +8,22 @@ import DropDownPicker from 'react-native-dropdown-picker';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";
 import { androidUI } from "../utils/androidUI";
+import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 
 const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
+
+// Define valid status transitions for strict workflow
+const getValidNextStatuses = (currentStatus: string): string[] => {
+  const validTransitions = {
+    'Pending': ['DC'],
+    'DC': ['Invoice'],
+    'Invoice': ['Dispatched'],
+    'Dispatched': [] // Final state, no further transitions
+  };
+  return validTransitions[currentStatus as keyof typeof validTransitions] || [];
+};
 
 const styles = StyleSheet.create({
   screenWrap: {
@@ -643,6 +655,7 @@ export default function OrdersScreen() {
   const { role, name } = useLocalSearchParams();
   const userRole = role ? String(role) : "User";
   const userName = name ? String(name) : "Unknown";
+  const { showToast } = useToast();
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -859,9 +872,11 @@ export default function OrdersScreen() {
     try {
       await updateOrder(menuOrder.orderId, { orderStatus: status });
       fetchAndSetOrders();
+      showToast(`Status updated to ${status}`, 'success');
     } catch (err: any) {
       console.error('Status update failed:', err.response?.data || err.message);
-      Alert.alert("Error", err.response?.data?.message || "Failed to update status");
+      const errorMessage = err.response?.data?.message || "Failed to update status";
+      showToast(errorMessage, 'error');
     }
   };
 
@@ -880,9 +895,11 @@ export default function OrdersScreen() {
             try {
               await deleteOrder(menuOrder.orderId);
               fetchAndSetOrders();
+              showToast('Order deleted successfully', 'success');
             } catch (err: any) {
               console.error('Delete failed:', err.response?.data || err.message);
-              Alert.alert("Error", err.response?.data?.message || "Failed to delete order");
+              const errorMessage = err.response?.data?.message || "Failed to delete order";
+              showToast(errorMessage, 'error');
             }
           }
         }
@@ -900,9 +917,11 @@ export default function OrdersScreen() {
         deliveryPartner: selectedDeliveryPartner
       });
       fetchAndSetOrders();
+      showToast(`Status updated to ${pendingStatusChange.newStatus}`, 'success');
     } catch (err: any) {
       console.error('Delivery partner update failed:', err.response?.data || err.message);
-      Alert.alert("Error", err.response?.data?.message || "Failed to update status");
+      const errorMessage = err.response?.data?.message || "Failed to update status";
+      showToast(errorMessage, 'error');
     }
     setPendingStatusChange(null);
     setSelectedDeliveryPartner(null);
@@ -932,9 +951,11 @@ export default function OrdersScreen() {
         paymentRecievedBy: selectedRecievedBy
       });
       fetchAndSetOrders();
+      showToast('Order marked as paid', 'success');
     } catch (err: any) {
       console.error('Payment update failed:', err.response?.data || err.message);
-      Alert.alert("Error", err.response?.data?.message || "Failed to mark as paid");
+      const errorMessage = err.response?.data?.message || "Failed to mark as paid";
+      showToast(errorMessage, 'error');
     }
     setPaymentOrder(null);
     setSelectedMarkedBy(null);
@@ -952,7 +973,12 @@ export default function OrdersScreen() {
     if (['Admin', 'Staff'].includes(userRole)) {
       options.push(
         { key: 'edit', label: 'Edit Order', action: handleEditOrder },
-        { key: 'status', label: 'Change Status', action: handleChangeStatus },
+        { 
+          key: 'status', 
+          label: 'Change Status', 
+          action: handleChangeStatus,
+          disabled: getValidNextStatuses(menuOrder?.orderStatus || '').length === 0
+        },
         { 
           key: 'paid', 
           label: 'Mark as Paid',
@@ -983,12 +1009,12 @@ export default function OrdersScreen() {
   return (
     <View style={styles.screenWrap}>
       {/* Fixed Header */}
-      <View style={styles.headerBar}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color="#3D5AFE" />
-        </Pressable>
-        <Text style={styles.headerTitle}>Orders</Text>
-      </View>
+              <View style={styles.headerBar}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color="#3D5AFE" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Orders</Text>
+        </View>
       {loading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color={ACCENT} />
@@ -1115,8 +1141,8 @@ export default function OrdersScreen() {
                 <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
                   <View style={styles.actionGrid}>
                     {showStatusOptions === item._id ? (
-                      // Show status options
-                      statusOptions.filter(s => s !== item.orderStatus).map((status) => (
+                      // Show only valid next status options
+                      getValidNextStatuses(item.orderStatus).map((status) => (
                         <Pressable
                           key={status}
                           style={[styles.actionButton, styles.statusButton]}

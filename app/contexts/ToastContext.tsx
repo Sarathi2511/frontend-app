@@ -23,6 +23,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' as 'success' | 'error' | 'info' });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info') => {
+    console.log('Toast called:', { message, type }); // Debug log
     setToast({ visible: true, message, type });
   };
 

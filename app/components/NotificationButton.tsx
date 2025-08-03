@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     margin: 20,
     borderRadius: 16,
-    maxHeight: '85%',
+    maxHeight: '100%',
     minHeight: '60%',
     elevation: 8,
     shadowColor: '#000',
@@ -198,6 +198,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 16,
     overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
   headerSection: {
     padding: 20,
@@ -234,6 +236,7 @@ const styles = StyleSheet.create({
   notificationsSection: {
     flex: 1,
     paddingHorizontal: 20,
+    minHeight: 200,
   },
   notificationsList: {
     flex: 1,
@@ -308,8 +311,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footerSection: {
-    padding: 20,
-    paddingTop: 16,
+    padding: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   closeButton: {
     borderRadius: 12,

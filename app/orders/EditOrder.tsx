@@ -4,14 +4,27 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
+import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
+
+// Define valid status transitions for strict workflow
+const getValidNextStatuses = (currentStatus: string): string[] => {
+  const validTransitions = {
+    'Pending': ['DC'],
+    'DC': ['Invoice'],
+    'Invoice': ['Dispatched'],
+    'Dispatched': [] // Final state, no further transitions
+  };
+  return validTransitions[currentStatus as keyof typeof validTransitions] || [];
+};
 const paymentOptions = ["Immediate", "15 Days", "30 Days"];
 
 export default function EditOrderScreen() {
   const { id, role } = useLocalSearchParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -266,21 +279,13 @@ export default function EditOrderScreen() {
                          err.message || 
                          'Failed to update order';
       
-      Alert.alert(
-        "Error Updating Order",
-        `${errorMessage}\n\nStatus: ${form.orderStatus}\nDelivery Partner: ${form.deliveryPartner || 'Not Set'}`,
-        [
-          { 
-            text: "OK",
-            onPress: () => {
-              // If error mentions delivery partner, open the selection modal
-              if (errorMessage.toLowerCase().includes('delivery partner')) {
-                setDeliveryPartnerDropdownOpen(true);
-              }
-            }
-          }
-        ]
-      );
+      // Show toast instead of alert
+      showToast(errorMessage, 'error');
+      
+      // If error mentions delivery partner, open the selection modal
+      if (errorMessage.toLowerCase().includes('delivery partner')) {
+        setDeliveryPartnerDropdownOpen(true);
+      }
     } finally {
       setUpdating(false);
     }
@@ -359,7 +364,7 @@ export default function EditOrderScreen() {
                 <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setStatusDropdownOpen(false)} />
                 <View style={styles.pickerModalSheet}>
                   <FlatList
-                    data={orderStatusOptions}
+                    data={getValidNextStatuses(form.orderStatus)}
                     keyExtractor={item => item}
                     renderItem={({ item }) => (
                       <Pressable
@@ -368,6 +373,13 @@ export default function EditOrderScreen() {
                       >
                         <Text style={[styles.pickerOptionText, form.orderStatus === item && styles.pickerOptionTextSelected]}>{item}</Text>
                       </Pressable>
+                    )}
+                    ListEmptyComponent={() => (
+                      <View style={{ padding: 16, alignItems: 'center' }}>
+                        <Text style={{ color: '#666', fontSize: 14, textAlign: 'center' }}>
+                          No further status changes allowed
+                        </Text>
+                      </View>
                     )}
                   />
                 </View>
