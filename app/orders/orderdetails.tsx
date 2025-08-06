@@ -117,6 +117,9 @@ export default function OrderDetailsScreen() {
             <Detail label="Customer Name" value={order.customerName} />
             <Detail label="Customer Phone" value={order.customerPhone} />
             <Detail label="Customer Address" value={order.customerAddress} />
+            {order.additionalNotes ? (
+              <Detail label="Additional Notes" value={order.additionalNotes} />
+            ) : null}
             <Detail label="Delivery Partner" value={order.deliveryPartner || 'Not Assigned'} />
           </View>
 
@@ -188,7 +191,7 @@ export default function OrderDetailsScreen() {
         <View style={styles.stickyTotalCard}>
           <Text style={styles.stickyTotalLabel}>Order Total</Text>
           <Text style={styles.stickyTotalValue}>
-            ₹{order.orderItems ? order.orderItems.reduce((sum: number, item: any) => sum + item.total, 0) : 0}
+            ₹{order.orderItems ? Math.round(order.orderItems.reduce((sum: number, item: any) => sum + item.total, 0)) : 0}
           </Text>
         </View>
       </View>

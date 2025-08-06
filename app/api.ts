@@ -102,4 +102,6 @@ export const createStaff = (data: any) => api.post('/staff', data);
 export const updateStaff = (id: string, data: any) => api.put(`/staff/${id}`, data);
 export const deleteStaff = (id: string) => api.delete(`/staff/${id}`);
 
-export const getExecutives = () => api.get('/staff').then(res => res.data.filter((u: any) => u.role === 'Executive')); 
+export const getExecutives = () => api.get('/staff').then(res => res.data.filter((u: any) => u.role === 'Executive'));
+
+export const getCustomerNames = () => api.get('/orders/customers'); 

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 // @ts-ignore
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { createOrder, getProducts, getStaff } from "../api";
+import { createOrder, getProducts, getStaff, getCustomerNames } from "../api";
 import { useOrder } from "./OrderContext";
 import { androidUI } from "../utils/androidUI";
 
@@ -41,6 +41,7 @@ export default function NewOrderScreen() {
     urgent: false,
     image: null as string | null, // local uri
     orderImage: null as string | null, // cloudinary url
+    additionalNotes: '',
   });
   const [imageUploading, setImageUploading] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
@@ -75,6 +76,10 @@ export default function NewOrderScreen() {
 
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+
+  const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
+  const [customerNameFocused, setCustomerNameFocused] = useState(false);
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -211,6 +216,28 @@ export default function NewOrderScreen() {
     fetchStaffList();
   }, []);
 
+  // Fetch customer suggestions as user types
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (form.customerName.trim().length === 0) {
+        setCustomerSuggestions([]);
+        setCustomerDropdownOpen(false);
+        return;
+      }
+      try {
+        const res = await getCustomerNames();
+        const names: string[] = res.data || [];
+        const filtered = names.filter(n => n.toLowerCase().includes(form.customerName.toLowerCase()) && n.trim() !== '');
+        setCustomerSuggestions(filtered);
+        setCustomerDropdownOpen(filtered.length > 0 && customerNameFocused);
+      } catch (err) {
+        setCustomerSuggestions([]);
+        setCustomerDropdownOpen(false);
+      }
+    };
+    if (customerNameFocused) fetchSuggestions();
+  }, [form.customerName, customerNameFocused]);
+
   const handleSubmit = async () => {
     // Validate required fields
     const requiredFields = [
@@ -242,6 +269,7 @@ export default function NewOrderScreen() {
         orderItems: orderItems,
         orderImage: form.orderImage || '',
         ...(scheduledFor ? { scheduledFor: scheduledFor.toISOString() } : {}),
+        ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
       });
       if (isMounted.current) {
         setShowToast(true);
@@ -354,15 +382,40 @@ export default function NewOrderScreen() {
             <View style={styles.sectionGroup}>
               <View style={styles.floatingLabelInputWrap}>
                 <Text style={styles.floatingLabel}>Customer Name</Text>
-                <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>👤</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={form.customerName}
-                    onChangeText={v => handleChange('customerName', v)}
-                    placeholder="Enter customer name"
-                    placeholderTextColor="#b0b3b8"
-                  />
+                <View style={{ position: 'relative' }}>
+                  <View style={styles.inputRow}>
+                    <Text style={styles.inputIcon}>👤</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={form.customerName}
+                      onChangeText={v => handleChange('customerName', v)}
+                      placeholder="Enter customer name"
+                      placeholderTextColor="#b0b3b8"
+                      onFocus={() => setCustomerNameFocused(true)}
+                      onBlur={() => setTimeout(() => setCustomerNameFocused(false), 200)}
+                    />
+                  </View>
+                  {customerDropdownOpen && customerSuggestions.length > 0 && (
+                    <View style={[styles.inlineDropdown, { top: '100%', left: 0, right: 0, zIndex: 12000 }]}> 
+                      <ScrollView keyboardShouldPersistTaps="handled" style={styles.dropdownScrollView}>
+                        {customerSuggestions.map((name, idx) => (
+                          <Pressable
+                            key={name + idx}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => {
+                              handleChange('customerName', name);
+                              setCustomerDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.inlineDropdownOptionText}>{name}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
                 </View>
               </View>
               <View style={styles.floatingLabelInputWrap}>
@@ -388,6 +441,20 @@ export default function NewOrderScreen() {
                     value={form.address}
                     onChangeText={v => handleChange('address', v)}
                     placeholder="Enter address"
+                    placeholderTextColor="#b0b3b8"
+                    multiline
+                  />
+                </View>
+              </View>
+              <View style={styles.floatingLabelInputWrap}>
+                <Text style={styles.floatingLabel}>Additional Notes</Text>
+                <View style={styles.inputRow}>
+                  <Text style={styles.inputIcon}>📝</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.additionalNotes || ''}
+                    onChangeText={v => handleChange('additionalNotes', v)}
+                    placeholder="Enter any additional notes (optional)"
                     placeholderTextColor="#b0b3b8"
                     multiline
                   />

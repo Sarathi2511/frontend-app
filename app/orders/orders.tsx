@@ -1281,6 +1281,7 @@ export default function OrdersScreen() {
                 styles.card,
                 pressed && styles.cardPressed
               ]}
+              onPress={() => router.push({ pathname: '/orders/orderdetails', params: { id: item.orderId, role } })}
             >
               {/* Line 1: Order ID and menu icon */}
               <View style={styles.cardRowTop}>
@@ -1328,7 +1329,7 @@ export default function OrdersScreen() {
               {/* Line 2.5: Total Price */}
               <View style={{ marginTop: 4, marginBottom: 2 }}>
                 <Text style={styles.orderCardTotal}>
-                  Total: ₹{Array.isArray(item.orderItems) ? item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0) : 0}
+                  Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
                 </Text>
               </View>
               {/* Line 3: Created date and payment chip */}
@@ -1503,7 +1504,7 @@ export default function OrdersScreen() {
               <Text style={styles.centeredModalTitle}>Mark as Paid</Text>
               
               <Text style={styles.centeredModalLabel}>Payment Marked By</Text>
-              <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: 10000, marginBottom: 16 }]}>
+              <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: openMarkedByDropdown ? 12000 : 10000, marginBottom: 16 }]}>
                 <Pressable style={[styles.centeredDropdownButton, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={openMarkedByDropdown ? closeMarkedByDropdown : openMarkedByDropdownFunc}>
                   <Text style={styles.inputIcon}>👤</Text>
                   <Text style={styles.centeredDropdownButtonText}>
@@ -1515,10 +1516,10 @@ export default function OrdersScreen() {
                 </Pressable>
                 {openMarkedByDropdown && (
                   <>
-                                      <Pressable 
-                    style={[styles.dropdownOverlay, { zIndex: 9999 }]} 
-                    onPress={closeMarkedByDropdown}
-                  />
+                    <Pressable 
+                      style={[styles.dropdownOverlay, { zIndex: 11999 }]} 
+                      onPress={closeMarkedByDropdown}
+                    />
                     <Animated.View
                       style={[
                         styles.inlineDropdown,
@@ -1527,7 +1528,7 @@ export default function OrdersScreen() {
                           transform: [
                             { translateY: markedByChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
                           ],
-                          zIndex: 10000
+                          zIndex: 12000
                         }
                       ]}
                     >
@@ -1563,8 +1564,8 @@ export default function OrdersScreen() {
                 )}
               </View>
 
-                          <Text style={styles.centeredModalLabel}>Payment Received By</Text>
-            <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: 10001, marginBottom: 24, marginTop: openMarkedByDropdown ? 120 : 0 }]}>
+              <Text style={styles.centeredModalLabel}>Payment Received By</Text>
+              <View style={[styles.centeredDropdownWrap, { position: 'relative', zIndex: openMarkedByDropdown ? 9000 : 11000, marginBottom: 24, marginTop: openMarkedByDropdown ? 120 : 0 }]}>
                 <Pressable style={[styles.centeredDropdownButton, styles.inputRow, styles.dropdownPickerEmphasis]} onPress={openRecievedByDropdown ? closeReceivedByDropdown : openReceivedByDropdownFunc}>
                   <Text style={styles.inputIcon}>👤</Text>
                   <Text style={styles.centeredDropdownButtonText}>
@@ -1576,10 +1577,10 @@ export default function OrdersScreen() {
                 </Pressable>
                 {openRecievedByDropdown && (
                   <>
-                                      <Pressable 
-                    style={[styles.dropdownOverlay, { zIndex: 9999 }]} 
-                    onPress={closeReceivedByDropdown}
-                  />
+                    <Pressable 
+                      style={[styles.dropdownOverlay, { zIndex: 10999 }]} 
+                      onPress={closeReceivedByDropdown}
+                    />
                     <Animated.View
                       style={[
                         styles.inlineDropdown,
@@ -1588,7 +1589,7 @@ export default function OrdersScreen() {
                           transform: [
                             { translateY: receivedByChevronAnim.interpolate({ inputRange: [0, 1], outputRange: [-10, 0] }) }
                           ],
-                          zIndex: 10001
+                          zIndex: 11000
                         }
                       ]}
                     >

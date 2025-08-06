@@ -35,6 +35,7 @@ export default function EditOrderScreen() {
     payment: paymentOptions[0],
     urgent: false,
     deliveryPartner: '',
+    additionalNotes: '',
   });
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -101,6 +102,7 @@ export default function EditOrderScreen() {
               payment: order.paymentCondition,
               urgent: order.urgent || false,
               deliveryPartner: order.deliveryPartner || '',
+              additionalNotes: order.additionalNotes || '',
             });
             setOrderItems(order.orderItems || []);
           }
@@ -324,6 +326,7 @@ export default function EditOrderScreen() {
       urgent: form.urgent,
       orderItems: orderItems,
       deliveryPartner: form.deliveryPartner,
+      ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
     };
 
     console.log('Attempting to update order:', {
@@ -407,6 +410,17 @@ export default function EditOrderScreen() {
                 value={form.address}
                 onChangeText={v => handleChange('address', v)}
                 placeholder="Enter address"
+                placeholderTextColor="#b0b3b8"
+                multiline
+              />
+            </View>
+            <View style={styles.floatingLabelInputWrap}>
+              <Text style={styles.floatingLabel}>Additional Notes</Text>
+              <TextInput
+                style={styles.input}
+                value={form.additionalNotes || ''}
+                onChangeText={v => handleChange('additionalNotes', v)}
+                placeholder="Enter any additional notes (optional)"
                 placeholderTextColor="#b0b3b8"
                 multiline
               />
@@ -703,7 +717,7 @@ export default function EditOrderScreen() {
                 <View style={styles.orderTotalCard}>
                   <Text style={styles.orderTotalLabel}>Order Total</Text>
                   <Text style={styles.orderTotalValue}>
-                    ₹{orderItems.reduce((sum, item) => sum + item.total, 0)}
+                    ₹{Math.round(orderItems.reduce((sum, item) => sum + item.total, 0))}
                   </Text>
                 </View>
               </View>
