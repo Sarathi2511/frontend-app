@@ -392,6 +392,25 @@ const styles = StyleSheet.create({
   chipIcon: {
     marginRight: 7,
   },
+  chipCount: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 6,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  chipCountText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  chipCountTextInactive: {
+    color: ACCENT,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   chipClearBtn: {
     marginLeft: 6,
     backgroundColor: '#ff5252',
@@ -832,6 +851,14 @@ export default function OrdersScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   
+  // Order counts for status filters
+  const [orderCounts, setOrderCounts] = useState<{[key: string]: number}>({
+    Pending: 0,
+    DC: 0,
+    Invoice: 0,
+    Dispatched: 0
+  });
+  
   // Staff List State
   const [staffList, setStaffList] = useState<any[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
@@ -872,9 +899,26 @@ export default function OrdersScreen() {
       const response = await getOrders();
       setOrders(response.data);
       setFilteredOrders(response.data);
+      
+      // Calculate order counts for each status
+      const counts = {
+        Pending: 0,
+        DC: 0,
+        Invoice: 0,
+        Dispatched: 0
+      };
+      
+      response.data.forEach((order: any) => {
+        if (counts.hasOwnProperty(order.orderStatus)) {
+          counts[order.orderStatus as keyof typeof counts]++;
+        }
+      });
+      
+      setOrderCounts(counts);
     } catch (err) {
       setOrders([]);
       setFilteredOrders([]);
+      setOrderCounts({ Pending: 0, DC: 0, Invoice: 0, Dispatched: 0 });
       Alert.alert("Error", "Failed to fetch orders");
     }
     setRefreshing(false);
@@ -953,24 +997,57 @@ export default function OrdersScreen() {
         if (exists) return prevOrders;
         return [newOrder, ...prevOrders];
       });
+      
+      // Update order counts
+      setOrderCounts(prevCounts => ({
+        ...prevCounts,
+        [data.order.orderStatus]: (prevCounts[data.order.orderStatus] || 0) + 1
+      }));
     };
 
     // Listen for order update events
     const handleOrderUpdated = (data: any) => {
-      // Update the order in the list
-      setOrders(prevOrders => 
-        prevOrders.map(order => 
+      // Update the order in the list and recalculate counts
+      setOrders(prevOrders => {
+        const updatedOrders = prevOrders.map(order => 
           order._id === data.order._id ? data.order : order
-        )
-      );
+        );
+        
+        // Recalculate counts after update
+        const counts = {
+          Pending: 0,
+          DC: 0,
+          Invoice: 0,
+          Dispatched: 0
+        };
+        
+        updatedOrders.forEach((order: any) => {
+          if (counts.hasOwnProperty(order.orderStatus)) {
+            counts[order.orderStatus as keyof typeof counts]++;
+          }
+        });
+        
+        setOrderCounts(counts);
+        return updatedOrders;
+      });
     };
 
     // Listen for order deletion events
     const handleOrderDeleted = (data: any) => {
-      // Remove the order from the list
-      setOrders(prevOrders => 
-        prevOrders.filter(order => order._id !== data.orderId)
-      );
+      // Remove the order from the list and update counts
+      setOrders(prevOrders => {
+        const deletedOrder = prevOrders.find(order => order._id === data.orderId);
+        const updatedOrders = prevOrders.filter(order => order._id !== data.orderId);
+        
+        if (deletedOrder) {
+          setOrderCounts(prevCounts => ({
+            ...prevCounts,
+            [deletedOrder.orderStatus]: Math.max(0, (prevCounts[deletedOrder.orderStatus] || 0) - 1)
+          }));
+        }
+        
+        return updatedOrders;
+      });
     };
 
     // Add event listeners
@@ -1248,6 +1325,11 @@ export default function OrdersScreen() {
             >
               <Ionicons name="list" size={16} color={statusFilter === null ? '#fff' : ACCENT} style={styles.chipIcon} />
               <Text style={[styles.chipText, statusFilter === null && styles.chipTextActive]}>All</Text>
+              <View style={styles.chipCount}>
+                <Text style={[styles.chipCountText, statusFilter !== null && styles.chipCountTextInactive]}>
+                  {orders.length}
+                </Text>
+              </View>
             </Pressable>
             {statusOptions.map(opt => (
               <Pressable
@@ -1267,6 +1349,11 @@ export default function OrdersScreen() {
                   style={styles.chipIcon}
                 />
                 <Text style={[styles.chipText, statusFilter === opt && styles.chipTextActive]}>{opt}</Text>
+                <View style={styles.chipCount}>
+                  <Text style={[styles.chipCountText, statusFilter !== opt && styles.chipCountTextInactive]}>
+                    {orderCounts[opt] || 0}
+                  </Text>
+                </View>
               </Pressable>
             ))}
           </ScrollView>
