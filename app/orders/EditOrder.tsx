@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
-import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId } from "../api";
+import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
@@ -29,6 +29,7 @@ export default function EditOrderScreen() {
     customerName: '',
     customerPhone: '',
     address: '',
+    orderRoute: '', // New field for order route
     orderStatus: orderStatusOptions[0],
     assignedTo: '',
     assignedToId: '',
@@ -42,6 +43,11 @@ export default function EditOrderScreen() {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [assignedDropdownOpen, setAssignedDropdownOpen] = useState(false);
   const [deliveryPartnerDropdownOpen, setDeliveryPartnerDropdownOpen] = useState(false);
+  
+  // Route suggestions state
+  const [routeSuggestions, setRouteSuggestions] = useState<string[]>([]);
+  const [routeFocused, setRouteFocused] = useState(false);
+  const [routeDropdownOpen, setRouteDropdownOpen] = useState(false);
   
   // Animation values for inline dropdowns
   const [statusChevronAnim] = useState(new Animated.Value(0));
@@ -84,6 +90,28 @@ export default function EditOrderScreen() {
     fetchStaffList();
   }, []);
 
+  // Fetch route suggestions as user types
+  useEffect(() => {
+    const fetchRouteSuggestions = async () => {
+      if (form.orderRoute.trim().length === 0) {
+        setRouteSuggestions([]);
+        setRouteDropdownOpen(false);
+        return;
+      }
+      try {
+        const res = await getOrderRoutes();
+        const routes: string[] = res.data || [];
+        const filtered = routes.filter(r => r.toLowerCase().includes(form.orderRoute.toLowerCase()) && r.trim() !== '');
+        setRouteSuggestions(filtered);
+        setRouteDropdownOpen(filtered.length > 0 && routeFocused);
+      } catch (err) {
+        setRouteSuggestions([]);
+        setRouteDropdownOpen(false);
+      }
+    };
+    if (routeFocused) fetchRouteSuggestions();
+  }, [form.orderRoute, routeFocused]);
+
   // Fetch order details
   useEffect(() => {
     if (id) {
@@ -96,6 +124,7 @@ export default function EditOrderScreen() {
               customerName: order.customerName,
               customerPhone: order.customerPhone,
               address: order.customerAddress,
+              orderRoute: order.orderRoute || '', // Add order route
               orderStatus: order.orderStatus,
               assignedTo: order.assignedTo,
               assignedToId: order.assignedToId || '',
@@ -317,6 +346,7 @@ export default function EditOrderScreen() {
     setUpdating(true);
     const orderData = {
       customerName: form.customerName,
+      orderRoute: form.orderRoute,
       customerPhone: form.customerPhone,
       customerAddress: form.address,
       orderStatus: form.orderStatus,
@@ -391,6 +421,44 @@ export default function EditOrderScreen() {
                 placeholder="Enter customer name"
                 placeholderTextColor="#b0b3b8"
               />
+            </View>
+            <View style={styles.floatingLabelInputWrap}>
+              <Text style={styles.floatingLabel}>Order Route</Text>
+              <View style={{ position: 'relative' }}>
+                <View style={styles.inputRow}>
+                  <Text style={styles.inputIcon}>🛣️</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={form.orderRoute}
+                    onChangeText={v => handleChange('orderRoute', v)}
+                    placeholder="Enter order route"
+                    placeholderTextColor="#b0b3b8"
+                    onFocus={() => setRouteFocused(true)}
+                    onBlur={() => setTimeout(() => setRouteFocused(false), 200)}
+                  />
+                </View>
+                {routeDropdownOpen && routeSuggestions.length > 0 && (
+                  <View style={[styles.inlineDropdown, { top: '100%', left: 0, right: 0, zIndex: 12000 }]}> 
+                    <ScrollView keyboardShouldPersistTaps="handled" style={styles.dropdownScrollView}>
+                      {routeSuggestions.map((route, idx) => (
+                        <Pressable
+                          key={route + idx}
+                          style={({ pressed }) => [
+                            styles.inlineDropdownOption,
+                            pressed && { opacity: 0.7 }
+                          ]}
+                          onPress={() => {
+                            handleChange('orderRoute', route);
+                            setRouteDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={styles.inlineDropdownOptionText}>{route}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
             </View>
             <View style={styles.floatingLabelInputWrap}>
               <Text style={styles.floatingLabel}>Customer Phone No</Text>
@@ -908,28 +976,25 @@ const styles = StyleSheet.create({
     borderRadius: 1,
   },
   floatingLabelInputWrap: {
-    marginBottom: androidUI.spacing.xl,
+    marginBottom: androidUI.spacing.lg,
   },
   floatingLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: ACCENT,
+    color: androidUI.colors.text.disabled,
     marginBottom: androidUI.spacing.sm,
-    marginLeft: 2,
-    letterSpacing: 0.1,
+    fontFamily: androidUI.fontFamily.regular,
   },
   input: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: androidUI.colors.border,
+    flex: 1,
+    borderWidth: 0,
     borderRadius: androidUI.borderRadius.medium,
-    padding: androidUI.spacing.lg,
+    paddingVertical: androidUI.spacing.lg,
+    paddingRight: androidUI.spacing.lg,
     fontSize: 16,
-    backgroundColor: '#f3f6fa',
+    backgroundColor: 'transparent',
     color: androidUI.colors.text.primary,
-    marginBottom: 0,
     fontFamily: androidUI.fontFamily.regular,
-    ...androidUI.shadow,
+    minHeight: 44,
   },
   disabledInput: {
     width: '100%',
@@ -1291,10 +1356,17 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f3f6fa',
+    borderRadius: androidUI.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    ...androidUI.shadow,
+    marginBottom: 2,
   },
   inputIcon: {
+    marginLeft: 12,
+    marginRight: 8,
     fontSize: 18,
-    marginRight: 12,
   },
   dropdownPickerEmphasis: {
     borderWidth: 1.5,

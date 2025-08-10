@@ -104,4 +104,5 @@ export const deleteStaff = (id: string) => api.delete(`/staff/${id}`);
 
 export const getExecutives = () => api.get('/staff').then(res => res.data.filter((u: any) => u.role === 'Executive'));
 
-export const getCustomerNames = () => api.get('/orders/customers'); 
+export const getCustomerNames = () => api.get('/orders/customers');
+export const getOrderRoutes = () => api.get('/orders/routes'); 

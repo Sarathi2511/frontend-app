@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 // @ts-ignore
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { createOrder, getProducts, getStaff, getCustomerNames } from "../api";
+import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes } from "../api";
 import { useOrder } from "./OrderContext";
 import { androidUI } from "../utils/androidUI";
 
@@ -34,6 +34,7 @@ export default function NewOrderScreen() {
     customerName: '',
     customerPhone: '',
     address: '',
+    orderRoute: '', // New field for order route
     orderStatus: orderStatusOptions[0],
     assignedTo: '',
     assignedToId: '',
@@ -80,6 +81,11 @@ export default function NewOrderScreen() {
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [customerNameFocused, setCustomerNameFocused] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+
+  // Route suggestions state
+  const [routeSuggestions, setRouteSuggestions] = useState<string[]>([]);
+  const [routeFocused, setRouteFocused] = useState(false);
+  const [routeDropdownOpen, setRouteDropdownOpen] = useState(false);
 
   const isMounted = useRef(true);
   useEffect(() => {
@@ -238,10 +244,33 @@ export default function NewOrderScreen() {
     if (customerNameFocused) fetchSuggestions();
   }, [form.customerName, customerNameFocused]);
 
+  // Fetch route suggestions as user types
+  useEffect(() => {
+    const fetchRouteSuggestions = async () => {
+      if (form.orderRoute.trim().length === 0) {
+        setRouteSuggestions([]);
+        setRouteDropdownOpen(false);
+        return;
+      }
+      try {
+        const res = await getOrderRoutes();
+        const routes: string[] = res.data || [];
+        const filtered = routes.filter(r => r.toLowerCase().includes(form.orderRoute.toLowerCase()) && r.trim() !== '');
+        setRouteSuggestions(filtered);
+        setRouteDropdownOpen(filtered.length > 0 && routeFocused);
+      } catch (err) {
+        setRouteSuggestions([]);
+        setRouteDropdownOpen(false);
+      }
+    };
+    if (routeFocused) fetchRouteSuggestions();
+  }, [form.orderRoute, routeFocused]);
+
   const handleSubmit = async () => {
     // Validate required fields
     const requiredFields = [
       { label: 'Customer Name', value: form.customerName },
+      { label: 'Order Route', value: form.orderRoute },
       { label: 'Customer Phone', value: form.customerPhone },
       { label: 'Address', value: form.address },
       { label: 'Order Status', value: form.orderStatus },
@@ -258,6 +287,7 @@ export default function NewOrderScreen() {
     try {
       await createOrder({
         customerName: form.customerName,
+        orderRoute: form.orderRoute,
         customerPhone: form.customerPhone,
         customerAddress: form.address,
         orderStatus: form.orderStatus,
@@ -411,6 +441,44 @@ export default function NewOrderScreen() {
                             }}
                           >
                             <Text style={styles.inlineDropdownOptionText}>{name}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <View style={styles.floatingLabelInputWrap}>
+                <Text style={styles.floatingLabel}>Order Route</Text>
+                <View style={{ position: 'relative' }}>
+                  <View style={styles.inputRow}>
+                    <Text style={styles.inputIcon}>🛣️</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={form.orderRoute}
+                      onChangeText={v => handleChange('orderRoute', v)}
+                      placeholder="Enter order route"
+                      placeholderTextColor="#b0b3b8"
+                      onFocus={() => setRouteFocused(true)}
+                      onBlur={() => setTimeout(() => setRouteFocused(false), 200)}
+                    />
+                  </View>
+                  {routeDropdownOpen && routeSuggestions.length > 0 && (
+                    <View style={[styles.inlineDropdown, { top: '100%', left: 0, right: 0, zIndex: 12000 }]}> 
+                      <ScrollView keyboardShouldPersistTaps="handled" style={styles.dropdownScrollView}>
+                        {routeSuggestions.map((route, idx) => (
+                          <Pressable
+                            key={route + idx}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => {
+                              handleChange('orderRoute', route);
+                              setRouteDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.inlineDropdownOptionText}>{route}</Text>
                           </Pressable>
                         ))}
                       </ScrollView>

@@ -384,6 +384,9 @@ export default function MyOrdersScreen() {
               {/* Line 2: Name and status chips */}
               <View style={styles.cardRowMid}>
                 <Text style={styles.customerName}>{item.customerName}</Text>
+                {item.orderRoute && (
+                  <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
+                )}
                 <View style={styles.chipGroup}>
                   <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
                     <Ionicons

@@ -161,6 +161,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginTop: 2,
   },
+  orderRoute: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: androidUI.colors.text.secondary,
+    marginBottom: 4,
+    marginTop: 2,
+  },
   created: {
     fontSize: 13,
     color: androidUI.colors.text.secondary,
@@ -963,7 +970,8 @@ export default function OrdersScreen() {
     if (search.trim()) {
       filtered = filtered.filter(o =>
         o.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        o.orderId.toLowerCase().includes(search.toLowerCase())
+        o.orderId.toLowerCase().includes(search.toLowerCase()) ||
+        (o.orderRoute && o.orderRoute.toLowerCase().includes(search.toLowerCase()))
       );
     }
     if (statusFilter) {
@@ -1313,7 +1321,7 @@ export default function OrdersScreen() {
         <View style={styles.filterBar}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by Name or ID"
+            placeholder="Search by Name, ID, or Route"
             value={search}
             onChangeText={setSearch}
           />
@@ -1387,6 +1395,9 @@ export default function OrdersScreen() {
               {/* Line 2: Name and status chips */}
               <View style={styles.cardRowMid}>
                 <Text style={styles.customerName}>{item.customerName}</Text>
+                {item.orderRoute && (
+                  <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
+                )}
                 <View style={styles.chipGroup}>
                   <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
                     <Ionicons

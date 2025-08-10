@@ -115,6 +115,7 @@ export default function OrderDetailsScreen() {
           <View style={styles.sectionCard}>
             {sectionHeader('📦', 'Delivery Details')}
             <Detail label="Customer Name" value={order.customerName} />
+            <Detail label="Order Route" value={order.orderRoute} />
             <Detail label="Customer Phone" value={order.customerPhone} />
             <Detail label="Customer Address" value={order.customerAddress} />
             {order.additionalNotes ? (
