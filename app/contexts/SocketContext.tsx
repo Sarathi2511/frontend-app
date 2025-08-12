@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useRef } from 'r
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotifications } from './NotificationContext';
+import { router } from 'expo-router';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -75,8 +76,18 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         }
       });
 
-      newSocket.on('connect_error', (error) => {
+      newSocket.on('connect_error', async (error) => {
         setIsConnected(false);
+        // If auth failed (expired/invalid token), perform logout flow
+        const message = String(error?.message || '').toLowerCase();
+        if (message.includes('auth') || message.includes('token')) {
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('userRole');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('userName');
+          try { newSocket.disconnect(); } catch {}
+          router.replace('/login');
+        }
       });
 
       // Additional event to confirm connection is working

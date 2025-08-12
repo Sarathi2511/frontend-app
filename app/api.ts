@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 // const BASE_URL = 'http://192.168.29.104:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
@@ -29,6 +30,16 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
+    // If token expired or unauthorized, clear auth and bubble up
+    if (error?.response?.status === 401) {
+      AsyncStorage.removeItem('token');
+      AsyncStorage.removeItem('userRole');
+      AsyncStorage.removeItem('userId');
+      AsyncStorage.removeItem('userName');
+      try {
+        router.replace('/login');
+      } catch {}
+    }
     console.error('Response Error:', error);
     return Promise.reject(error);
   }
@@ -47,6 +58,8 @@ export const login = async (phone: string, password: string) => {
 export const logout = async () => {
   await AsyncStorage.removeItem('token');
   await AsyncStorage.removeItem('userRole');
+  await AsyncStorage.removeItem('userId');
+  await AsyncStorage.removeItem('userName');
 };
 
 // Helper function to get current user role
@@ -106,3 +119,13 @@ export const getExecutives = () => api.get('/staff').then(res => res.data.filter
 
 export const getCustomerNames = () => api.get('/orders/customers');
 export const getOrderRoutes = () => api.get('/orders/routes'); 
+
+// Token validation (lightweight check used on app start/resume)
+export const validateToken = async () => {
+  try {
+    const res = await api.get('/login/validate');
+    return res.data;
+  } catch (e) {
+    throw e;
+  }
+};

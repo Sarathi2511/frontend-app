@@ -5,6 +5,8 @@ import { Animated, Dimensions, Platform, Pressable, StyleSheet, Text, View } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "./utils/androidUI";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { validateToken } from './api';
 
 const { width, height } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
@@ -22,6 +24,27 @@ export default function Welcome() {
         useNativeDriver: true,
       })
     ).start();
+
+    // On landing, auto-route based on token validity
+    const bootstrap = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const role = await AsyncStorage.getItem('userRole');
+        const name = await AsyncStorage.getItem('userName');
+        if (token && role) {
+          // Verify token with backend; if invalid, clear and stay
+          await validateToken();
+          router.replace({ pathname: "./dashboard", params: { role, name: name || 'User' } });
+        }
+      } catch {
+        // invalid token; ensure cleared
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('userRole');
+        await AsyncStorage.removeItem('userId');
+        await AsyncStorage.removeItem('userName');
+      }
+    };
+    bootstrap();
   }, []);
 
   const spin = iconAnim.interpolate({

@@ -29,13 +29,26 @@ export default function LoginScreen() {
   // Check if user is already logged in
   useEffect(() => {
     const checkLoginStatus = async () => {
-      const token = await AsyncStorage.getItem('token');
-      const role = await AsyncStorage.getItem('userRole');
-      const name = await AsyncStorage.getItem('userName');
-      if (token && role) {
-        // Establish WebSocket connection for already logged in user
-        await connect();
-        router.replace({ pathname: "./dashboard", params: { role, name } });
+      try {
+        const token = await AsyncStorage.getItem('token');
+        const role = await AsyncStorage.getItem('userRole');
+        const name = await AsyncStorage.getItem('userName');
+        if (token && role) {
+          // Validate token with backend
+          const { success } = await (await import('./api')).validateToken();
+          if (success) {
+            await connect();
+            router.replace({ pathname: "./dashboard", params: { role, name } });
+            return;
+          }
+        }
+        // Token invalid; ensure cleared
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('userRole');
+        await AsyncStorage.removeItem('userId');
+        await AsyncStorage.removeItem('userName');
+      } catch {
+        // ignore
       }
     };
     checkLoginStatus();
