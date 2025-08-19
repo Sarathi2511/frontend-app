@@ -110,6 +110,20 @@ export const updateProduct = (id: string, data: any) => api.put(`/products/${id}
 export const deleteProduct = (id: string) => api.delete(`/products/${id}`);
 export const getBrands = () => api.get('/products/brands');
 
+export const importProductsCSV = async (file: { uri: string; name?: string; mimeType?: string }) => {
+  const form = new FormData();
+  // React Native FormData requires fields as { uri, name, type }
+  form.append('file', {
+    // @ts-ignore: React Native's FormData file type
+    uri: file.uri,
+    name: file.name || 'products.csv',
+    type: file.mimeType || 'text/csv',
+  } as any);
+  return api.post('/products/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
 // Staff API
 export const getStaff = () => api.get('/staff');
 export const createStaff = (data: any) => api.post('/staff', data);

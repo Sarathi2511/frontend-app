@@ -1,12 +1,14 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput, Animated } from "react-native";
-import { getProducts, deleteProduct } from "../api";
+import { getProducts, deleteProduct, importProductsCSV } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";
+import { useToast } from "../contexts/ToastContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
+import * as DocumentPicker from 'expo-document-picker';
 
 const ACCENT = "#3D5AFE";
 
@@ -14,12 +16,15 @@ export default function ProductsScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams();
   const userRole = role ? String(role) : "User";
+  const canImport = ['Admin', 'Staff', 'Executive'].includes(userRole);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const [animatedHeight] = useState(new Animated.Value(0));
   const { isConnected, lastProductEvent } = useSocket();
+  const [importing, setImporting] = useState(false);
+  const { showToast } = useToast();
 
   const fetchAndSetProducts = async () => {
     setLoading(true);
@@ -105,6 +110,23 @@ export default function ProductsScreen() {
     );
   };
 
+  const handleImportCSV = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream'] });
+      if (result.canceled) return;
+      const file = result.assets?.[0];
+      if (!file) return;
+      setImporting(true);
+      const response = await importProductsCSV({ uri: file.uri, name: file.name, mimeType: file.mimeType });
+      const summary = response.data;
+      await fetchAndSetProducts();
+      showToast('Import successful', 'success');
+    } catch (e: any) {
+      showToast('Import failed', 'error');
+    }
+    setImporting(false);
+  };
+
   // Filter products by search
   const filteredProducts = products.filter(
     (p) =>
@@ -137,6 +159,19 @@ export default function ProductsScreen() {
               value={search}
               onChangeText={setSearch}
             />
+            {canImport && (
+              <>
+                <View style={{ height: 10 }} />
+                <Pressable
+                  disabled={importing}
+                  style={[styles.importBtn, importing && { opacity: 0.6 }]}
+                  onPress={handleImportCSV}
+                >
+                  <Ionicons name="cloud-upload" size={18} color="#fff" />
+                  <Text style={styles.importBtnText}>{importing ? 'Importing...' : 'Import CSV'}</Text>
+                </Pressable>
+              </>
+            )}
           </View>
           <FlatList
             data={filteredProducts}
@@ -399,5 +434,21 @@ const styles = StyleSheet.create({
     marginBottom: 0,
     fontSize: 15,
     color: androidUI.colors.text.primary,
+  },
+  importBtn: {
+    backgroundColor: ACCENT,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: androidUI.borderRadius.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  importBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
 }); 
