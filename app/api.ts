@@ -2,7 +2,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
-// const BASE_URL = 'http://192.168.29.104:5000/api';
+// const BASE_URL = 'http://192.168.29.111:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
 
 const api = axios.create({
@@ -108,6 +108,7 @@ export const getProducts = () => api.get('/products');
 export const createProduct = (data: any) => api.post('/products', data);
 export const updateProduct = (id: string, data: any) => api.put(`/products/${id}`, data);
 export const deleteProduct = (id: string) => api.delete(`/products/${id}`);
+export const getBrands = () => api.get('/products/brands');
 
 // Staff API
 export const getStaff = () => api.get('/staff');
@@ -119,6 +120,7 @@ export const getExecutives = () => api.get('/staff').then(res => res.data.filter
 
 export const getCustomerNames = () => api.get('/orders/customers');
 export const getOrderRoutes = () => api.get('/orders/routes'); 
+export const getCustomers = () => api.get('/customers');
 
 // Token validation (lightweight check used on app start/resume)
 export const validateToken = async () => {

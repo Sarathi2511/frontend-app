@@ -109,6 +109,7 @@ export default function ProductsScreen() {
   const filteredProducts = products.filter(
     (p) =>
       p.name.toLowerCase().includes(search.toLowerCase()) ||
+      (p.brandName && p.brandName.toLowerCase().includes(search.toLowerCase())) ||
       (p.dimension && p.dimension.toLowerCase().includes(search.toLowerCase()))
   );
 
@@ -159,8 +160,12 @@ export default function ProductsScreen() {
                     </Animated.View>
                   </Pressable>
                 </View>
-                {/* Middle Row: Stock and Dimension */}
+                {/* Middle Row: Brand, Stock and Dimension */}
                 <View style={styles.cardRowMid}>
+                  <View style={styles.infoGroup}>
+                    <Text style={styles.infoLabel}>Brand</Text>
+                    <Text style={styles.infoValue}>{item.brandName || '-'}</Text>
+                  </View>
                   <View style={styles.infoGroup}>
                     <Text style={styles.infoLabel}>Stock</Text>
                     <Text style={styles.infoValue}>{item.stockQuantity}</Text>

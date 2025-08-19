@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, ActivityIndicator, Alert, Animated, SafeAreaView } from "react-native";
-import { getProducts, updateProduct } from "../api";
+import { getProducts, updateProduct, getBrands } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
@@ -34,10 +34,15 @@ export default function EditProductScreen() {
   const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
+    brandName: '',
     stockQuantity: '',
     dimension: dimensionOptions[0],
     lowStockThreshold: '',
   });
+  const [allBrands, setAllBrands] = useState<string[]>([]);
+  const [brandSuggestions, setBrandSuggestions] = useState<string[]>([]);
+  const [brandFocused, setBrandFocused] = useState(false);
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [dimensionDropdownOpen, setDimensionDropdownOpen] = useState(false);
@@ -53,6 +58,7 @@ export default function EditProductScreen() {
           if (product) {
             setForm({
               name: product.name || '',
+              brandName: product.brandName || '',
               stockQuantity: String(product.stockQuantity ?? ''),
               dimension: product.dimension || dimensionOptions[0],
               lowStockThreshold: String(product.lowStockThreshold ?? ''),
@@ -92,6 +98,7 @@ export default function EditProductScreen() {
     // Validate required fields
     const requiredFields = [
       { label: 'Product Name', value: form.name },
+      { label: 'Brand Name', value: form.brandName },
       { label: 'Stock Quantity', value: form.stockQuantity },
       { label: 'Dimension', value: form.dimension },
       { label: 'Low Stock Threshold Value', value: form.lowStockThreshold },
@@ -104,6 +111,7 @@ export default function EditProductScreen() {
     }
     const productData = {
       name: form.name,
+      brandName: form.brandName.trim(),
       stockQuantity: Number(form.stockQuantity),
       dimension: form.dimension,
       lowStockThreshold: Number(form.lowStockThreshold),
@@ -141,6 +149,63 @@ export default function EditProductScreen() {
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}
             <View style={styles.sectionGroup}>
+              {/* Brand Name with suggestions */}
+              <View style={styles.floatingLabelInputWrap}>
+                <Text style={styles.floatingLabel}>Brand Name</Text>
+                <View style={{ position: 'relative' }}>
+                  <View style={styles.inputRow}>
+                    <Text style={styles.inputIcon}>🏷️</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={form.brandName}
+                      onChangeText={(v) => {
+                        handleChange('brandName', v);
+                        const filtered = allBrands.filter((b: string) => b.toLowerCase().includes(v.toLowerCase()));
+                        setBrandSuggestions(filtered);
+                        setBrandDropdownOpen(filtered.length > 0 && brandFocused);
+                      }}
+                      placeholder="Enter brand name"
+                      placeholderTextColor="#b0b3b8"
+                      onFocus={async () => {
+                        setBrandFocused(true);
+                        try {
+                          const res = await getBrands();
+                          const all = Array.isArray(res.data) ? res.data : [];
+                          setAllBrands(all);
+                          setBrandSuggestions(all);
+                          setBrandDropdownOpen(all.length > 0);
+                        } catch {
+                          setAllBrands([]);
+                          setBrandSuggestions([]);
+                          setBrandDropdownOpen(false);
+                        }
+                      }}
+                      onBlur={() => setTimeout(() => { setBrandFocused(false); setBrandDropdownOpen(false); }, 150)}
+                    />
+                  </View>
+                  {brandDropdownOpen && brandSuggestions.length > 0 && (
+                    <View style={[styles.inlineDropdown, { top: '100%', left: 0, right: 0, zIndex: 12000 }]}> 
+                      <ScrollView keyboardShouldPersistTaps="handled" style={styles.dropdownScrollView}>
+                        {brandSuggestions.map((bn, idx) => (
+                          <Pressable
+                            key={bn + idx}
+                            style={({ pressed }) => [
+                              styles.inlineDropdownOption,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => {
+                              handleChange('brandName', bn);
+                              setBrandDropdownOpen(false);
+                            }}
+                          >
+                            <Text style={styles.inlineDropdownOptionText}>{bn}</Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              </View>
               <View style={styles.floatingLabelInputWrap}>
                 <Text style={styles.floatingLabel}>Product Name</Text>
                 <View style={styles.inputRow}>

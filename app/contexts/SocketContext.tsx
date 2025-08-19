@@ -33,7 +33,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { addNotification } = useNotifications();
   const BASE_URL = 'https://backend-app-1qf1.onrender.com';
-  // const BASE_URL = 'http://192.168.29.104:5000';
+  // const BASE_URL = 'http://192.168.29.111:5000';
 
   const connect = async () => {
     try {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Platform, Dimensions } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { getOrders, getProducts, getExecutives } from "./api";
+import { getOrders, getProducts, getExecutives, getCustomers, getBrands } from "./api";
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from "react-native-chart-kit";
 import { androidUI } from "./utils/androidUI";
@@ -47,7 +47,10 @@ export default function AnalyticsScreen() {
     salesShare: 0,
     topExecProducts: []
   });
-  const [selectedTab, setSelectedTab] = useState<'general' | 'executive'>('general');
+  const [selectedTab, setSelectedTab] = useState<'general' | 'executive' | 'customers'>('general');
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
     fetchAnalytics();
@@ -57,21 +60,25 @@ export default function AnalyticsScreen() {
     setLoading(true);
     try {
       // Fetch orders, products, and executives in parallel
-      const [ordersResponse, productsResponse, executives] = await Promise.all([
+      const [ordersResponse, productsResponse, executives, customersRes, brandsRes] = await Promise.all([
         getOrders(),
         getProducts(),
-        getExecutives()
+        getExecutives(),
+        getCustomers(),
+        getBrands()
       ]);
 
-      const orders = ordersResponse.data;
+      const ordersData = ordersResponse.data;
       const products = productsResponse.data;
+      const customersList = customersRes.data || [];
+      const brandsList = brandsRes.data || [];
       // executives is already filtered to role === 'Executive'
 
       // Calculate metrics
-      const totalOrders = orders.length;
+      const totalOrders = ordersData.length;
       const totalInventory = products.length;
       // Calculate total sales and average order value
-      const totalSales = orders.reduce((sum: number, order: any) => {
+      const totalSales = ordersData.reduce((sum: number, order: any) => {
         const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
         return sum + orderTotal;
       }, 0);
@@ -79,7 +86,7 @@ export default function AnalyticsScreen() {
 
       // --- Sales Over Time (by month) ---
       const salesByMonth: { [key: string]: number } = {};
-      orders.forEach((order: any) => {
+      ordersData.forEach((order: any) => {
         const date = new Date(order.date);
         const label = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; // e.g. 2024-06
         const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
@@ -93,7 +100,7 @@ export default function AnalyticsScreen() {
 
       // --- Top Selling Products ---
       const productSales: { [name: string]: { totalSold: number; totalRevenue: number } } = {};
-      orders.forEach((order: any) => {
+      ordersData.forEach((order: any) => {
         order.orderItems.forEach((item: any) => {
           if (!productSales[item.name]) {
             productSales[item.name] = { totalSold: 0, totalRevenue: 0 };
@@ -109,7 +116,7 @@ export default function AnalyticsScreen() {
 
       // Executive Analytics
       const executiveNames = executives.map((e: any) => e.name);
-      const execOrders = orders.filter((order: any) => executiveNames.includes(order.createdBy));
+      const execOrders = ordersData.filter((order: any) => executiveNames.includes(order.createdBy));
       const executiveOrders = execOrders.length;
       const executiveSales = execOrders.reduce((sum: number, order: any) => {
         const orderTotal = order.orderItems.reduce((itemSum: number, item: any) => itemSum + (item.total || 0), 0);
@@ -146,6 +153,9 @@ export default function AnalyticsScreen() {
         salesShare,
         topExecProducts
       });
+      setCustomers(customersList);
+      setBrands(brandsList);
+      setOrders(ordersData);
     } catch (err) {
       console.error('Error fetching analytics:', err);
     } finally {
@@ -176,13 +186,19 @@ export default function AnalyticsScreen() {
           style={[styles.tabBtn, selectedTab === 'general' && styles.tabBtnActive]}
           onPress={() => setSelectedTab('general')}
         >
-          <Text style={[styles.tabText, selectedTab === 'general' && styles.tabTextActive]}>General Analytics</Text>
+          <Text style={[styles.tabText, selectedTab === 'general' && styles.tabTextActive]}>General</Text>
         </Pressable>
         <Pressable
           style={[styles.tabBtn, selectedTab === 'executive' && styles.tabBtnActive]}
           onPress={() => setSelectedTab('executive')}
         >
-          <Text style={[styles.tabText, selectedTab === 'executive' && styles.tabTextActive]}>Executive Analytics</Text>
+          <Text style={[styles.tabText, selectedTab === 'executive' && styles.tabTextActive]}>Executive</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tabBtn, selectedTab === 'customers' && styles.tabBtnActive]}
+          onPress={() => setSelectedTab('customers')}
+        >
+          <Text style={[styles.tabText, selectedTab === 'customers' && styles.tabTextActive]}>Customer</Text>
         </Pressable>
       </View>
 
@@ -288,7 +304,7 @@ export default function AnalyticsScreen() {
                 <Text style={styles.noDataText}>No product sales data available.</Text>
               )}
             </>
-          ) : (
+          ) : selectedTab === 'executive' ? (
             <>
               {/* Executive Analytics Section */}
               <View style={styles.metricsGrid}>
@@ -328,6 +344,84 @@ export default function AnalyticsScreen() {
                 </View>
               ) : (
                 <Text style={styles.noDataText}>No executive product sales data available.</Text>
+              )}
+            </>
+          ) : (
+            // Customer Analytics (Simple only)
+            <>
+              <Text style={styles.sectionTitle}>Brand Affinity by Customer</Text>
+              {customers.length === 0 ? (
+                <Text style={styles.noDataText}>No customers found.</Text>
+              ) : (
+                <>
+                  {/* Popular brands summary */}
+                  {(() => {
+                    const brandCounts: Record<string, number> = {};
+                    brands.forEach((b) => (brandCounts[b] = 0));
+                    customers.forEach((cust) => {
+                      const purchased = new Set<string>();
+                      orders.forEach((order: any) => {
+                        if (order.customerName && cust.name && order.customerName.toLowerCase() === String(cust.name).toLowerCase()) {
+                          (order.orderItems || []).forEach((item: any) => {
+                            if (item.brandName) purchased.add(item.brandName);
+                          });
+                        }
+                      });
+                      purchased.forEach((b) => { if (brandCounts[b] !== undefined) brandCounts[b] += 1; });
+                    });
+                    const sorted = brands
+                      .map((b) => ({ brand: b, count: brandCounts[b] || 0 }))
+                      .sort((a, b) => b.count - a.count);
+                    return (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row' }}>
+                          {sorted.map(({ brand, count }) => (
+                            <View key={brand} style={styles.brandChip}>
+                              <Text style={styles.brandChipText}>{brand}</Text>
+                              <Text style={styles.brandChipCount}>{count}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
+                    );
+                  })()}
+
+                  {/* Customer rows with purchased brand chips */}
+                  <View style={{ gap: 8 }}>
+                    {customers.map((cust) => {
+                      const purchasedBrands: string[] = [];
+                      const seen = new Set<string>();
+                      orders.forEach((order: any) => {
+                        if (order.customerName && cust.name && order.customerName.toLowerCase() === String(cust.name).toLowerCase()) {
+                          (order.orderItems || []).forEach((item: any) => {
+                            if (item.brandName && !seen.has(item.brandName)) {
+                              seen.add(item.brandName);
+                              purchasedBrands.push(item.brandName);
+                            }
+                          });
+                        }
+                      });
+                      return (
+                        <View key={cust._id || cust.name} style={styles.caRowSimple}>
+                          <Text style={styles.caCellCustomer} numberOfLines={1}>{cust.name}</Text>
+                          {purchasedBrands.length === 0 ? (
+                            <Text style={styles.caNoBrandsText}>— No brand purchases yet</Text>
+                          ) : (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                              <View style={{ flexDirection: 'row' }}>
+                                {purchasedBrands.map((b) => (
+                                  <View key={b} style={styles.purchasedChip}>
+                                    <Text style={styles.purchasedChipText}>{b}</Text>
+                                  </View>
+                                ))}
+                              </View>
+                            </ScrollView>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
               )}
             </>
           )}
@@ -500,5 +594,108 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: ACCENT,
+  },
+  // Customer Analytics table styles
+  caRowHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef2ff',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  caRowSimple: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    ...androidUI.shadow,
+  },
+  caRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    ...androidUI.shadow,
+  },
+  caCellHeader: {
+    fontWeight: '700',
+    color: ACCENT,
+  },
+  caCellCustomer: {
+    width: 140,
+    marginRight: 8,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+  },
+  brandChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f7ff',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e3eaff',
+  },
+  brandChipText: {
+    color: ACCENT,
+    fontWeight: '700',
+    marginRight: 8,
+  },
+  brandChipCount: {
+    backgroundColor: ACCENT,
+    color: '#fff',
+    fontWeight: '700',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  purchasedChip: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#c8e6c9',
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  purchasedChipText: {
+    color: '#2e7d32',
+    fontWeight: '700',
+  },
+  caCellBrand: {
+    width: 90,
+    textAlign: 'center',
+    marginRight: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#f3f6fa',
+    color: androidUI.colors.text.primary,
+  },
+  caYes: {
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
+    fontWeight: '700',
+  },
+  caNo: {
+    backgroundColor: '#ffebee',
+    color: '#c62828',
+    fontWeight: '700',
+  },
+  caNoBrandsText: {
+    color: androidUI.colors.text.disabled,
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginBottom: androidUI.spacing.md,
+    textAlign: 'center',
   },
 }); 
