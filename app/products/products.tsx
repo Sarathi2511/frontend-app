@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput, Animated } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput, Animated, Modal } from "react-native";
 import { getProducts, deleteProduct, importProductsCSV } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
@@ -26,6 +26,21 @@ export default function ProductsScreen() {
   const [importing, setImporting] = useState(false);
   const { showToast } = useToast();
 
+  // Import progress state
+  const [importProgress, setImportProgress] = useState({
+    visible: false,
+    progress: 0,
+    status: '',
+    fileName: '',
+    totalRows: 0,
+    processedRows: 0,
+    created: 0,
+    updated: 0,
+    errors: [] as any[],
+    warnings: [] as any[],
+    isComplete: false
+  });
+
   const fetchAndSetProducts = async () => {
     setLoading(true);
     try {
@@ -45,10 +60,7 @@ export default function ProductsScreen() {
   // Listen for real-time product updates
   useEffect(() => {
     if (lastProductEvent) {
-      // Refresh products list when real-time events occur
-      if (lastProductEvent.type === 'created' || lastProductEvent.type === 'updated' || lastProductEvent.type === 'deleted') {
-        fetchAndSetProducts();
-      }
+      fetchAndSetProducts();
     }
   }, [lastProductEvent]);
 
@@ -112,19 +124,99 @@ export default function ProductsScreen() {
 
   const handleImportCSV = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({ type: ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream'] });
+      const result = await DocumentPicker.getDocumentAsync({ 
+        type: ['text/csv', 'application/vnd.ms-excel', 'application/octet-stream'] 
+      });
+      
       if (result.canceled) return;
       const file = result.assets?.[0];
       if (!file) return;
+
+      // Initialize import progress
+      setImportProgress({
+        visible: true,
+        progress: 0,
+        status: 'Starting import...',
+        fileName: file.name || 'products.csv',
+        totalRows: 0,
+        processedRows: 0,
+        created: 0,
+        updated: 0,
+        errors: [],
+        warnings: [],
+        isComplete: false
+      });
+
       setImporting(true);
-      const response = await importProductsCSV({ uri: file.uri, name: file.name, mimeType: file.mimeType });
+
+      // Simulate progress updates (since backend doesn't provide real-time progress)
+      const progressInterval = setInterval(() => {
+        setImportProgress(prev => {
+          if (prev.progress < 90) {
+            return {
+              ...prev,
+              progress: prev.progress + Math.random() * 10,
+              status: prev.progress < 30 ? 'Reading CSV file...' :
+                      prev.progress < 60 ? 'Processing data...' :
+                      prev.progress < 90 ? 'Importing products...' : 'Finalizing...'
+            };
+          }
+          return prev;
+        });
+      }, 200);
+
+      const response = await importProductsCSV({ 
+        uri: file.uri, 
+        name: file.name, 
+        mimeType: file.mimeType 
+      });
+      
       const summary = response.data;
+      
+      // Clear progress interval and show final results
+      clearInterval(progressInterval);
+      
+      setImportProgress(prev => ({
+        ...prev,
+        progress: 100,
+        status: 'Import completed!',
+        totalRows: summary.totalRows || 0,
+        processedRows: summary.totalRows || 0,
+        created: summary.created || 0,
+        updated: summary.updated || 0,
+        errors: summary.errors || [],
+        warnings: summary.warnings || [],
+        isComplete: true
+      }));
+
       await fetchAndSetProducts();
-      showToast('Import successful', 'success');
+
+      // Show success message with details
+      const successMessage = `Import completed! ${summary.created} created, ${summary.updated} updated${summary.warnings.length > 0 ? `, ${summary.warnings.length} warnings` : ''}${summary.errors.length > 0 ? `, ${summary.errors.length} errors` : ''}`;
+      showToast(successMessage, 'success');
+
     } catch (e: any) {
-      showToast('Import failed', 'error');
+      setImportProgress(prev => ({
+        ...prev,
+        progress: 0,
+        status: 'Import failed',
+        isComplete: true
+      }));
+      
+      const errorMessage = e.message || 'Import failed. Please check your CSV file and try again.';
+      showToast(errorMessage, 'error');
+    } finally {
+      setImporting(false);
+      
+      // Auto-hide progress modal after 3 seconds
+      setTimeout(() => {
+        setImportProgress(prev => ({ ...prev, visible: false }));
+      }, 3000);
     }
-    setImporting(false);
+  };
+
+  const closeImportProgress = () => {
+    setImportProgress(prev => ({ ...prev, visible: false }));
   };
 
   // Filter products by search
@@ -167,15 +259,122 @@ export default function ProductsScreen() {
                   style={[styles.importBtn, importing && { opacity: 0.6 }]}
                   onPress={handleImportCSV}
                 >
-                  <Ionicons name="cloud-upload" size={18} color="#fff" />
-                  <Text style={styles.importBtnText}>{importing ? 'Importing...' : 'Import CSV'}</Text>
+                  <Ionicons name="cloud-upload" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.importBtnText}>
+                    {importing ? 'Importing...' : 'Import CSV'}
+                  </Text>
                 </Pressable>
               </>
             )}
           </View>
+
+          {/* Import Progress Modal */}
+          <Modal
+            visible={importProgress.visible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={closeImportProgress}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.progressModal}>
+                <View style={styles.progressHeader}>
+                  <Ionicons 
+                    name={importProgress.isComplete ? "checkmark-circle" : "cloud-upload"} 
+                    size={32} 
+                    color={importProgress.isComplete ? "#4CAF50" : ACCENT} 
+                  />
+                  <Text style={styles.progressTitle}>
+                    {importProgress.isComplete ? 'Import Complete' : 'Importing Products'}
+                  </Text>
+                  <Text style={styles.fileName}>{importProgress.fileName}</Text>
+                </View>
+
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBar}>
+                    <Animated.View 
+                      style={[
+                        styles.progressFill, 
+                        { width: `${importProgress.progress}%` }
+                      ]} 
+                    />
+                  </View>
+                  <Text style={styles.progressText}>{Math.round(importProgress.progress)}%</Text>
+                </View>
+
+                <Text style={styles.statusText}>{importProgress.status}</Text>
+
+                {importProgress.isComplete && importProgress.totalRows > 0 && (
+                  <View style={styles.resultsContainer}>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Total Rows:</Text>
+                      <Text style={styles.resultValue}>{importProgress.totalRows}</Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Created:</Text>
+                      <Text style={[styles.resultValue, { color: '#4CAF50' }]}>{importProgress.created}</Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Updated:</Text>
+                      <Text style={[styles.resultValue, { color: '#2196F3' }]}>{importProgress.updated}</Text>
+                    </View>
+                    {importProgress.errors.length > 0 && (
+                      <View style={styles.resultRow}>
+                        <Text style={styles.resultLabel}>Errors:</Text>
+                        <Text style={[styles.resultValue, { color: '#F44336' }]}>{importProgress.errors.length}</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+                                 {importProgress.warnings.length > 0 && (
+                   <View style={styles.warningsContainer}>
+                     <Text style={styles.warningsTitle}>Warnings:</Text>
+                     <View style={styles.warningsList}>
+                       {importProgress.warnings.slice(0, 3).map((warning, index) => (
+                         <Text key={index} style={styles.warningText}>
+                           Row {warning.row}: {warning.message}
+                         </Text>
+                       ))}
+                       {importProgress.warnings.length > 3 && (
+                         <Text style={styles.warningText}>
+                           ...and {importProgress.warnings.length - 3} more warnings
+                         </Text>
+                       )}
+                     </View>
+                   </View>
+                 )}
+
+                 {importProgress.errors.length > 0 && (
+                   <View style={styles.errorsContainer}>
+                     <Text style={styles.errorsTitle}>Errors Found:</Text>
+                     <View style={styles.errorsList}>
+                       {importProgress.errors.slice(0, 3).map((error, index) => (
+                         <Text key={index} style={styles.errorText}>
+                           Row {error.row}: {error.message}
+                         </Text>
+                       ))}
+                       {importProgress.errors.length > 3 && (
+                         <Text style={styles.errorText}>
+                           ...and {importProgress.errors.length - 3} more errors
+                         </Text>
+                       )}
+                     </View>
+                   </View>
+                 )}
+
+                <Pressable 
+                  style={styles.closeButton} 
+                  onPress={closeImportProgress}
+                >
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+
           <FlatList
             data={filteredProducts}
-            keyExtractor={item => item._id}
+            keyExtractor={(item, index) => `${item._id || 'product'}-${index}`}
             contentContainerStyle={{ paddingBottom: 32 }}
             renderItem={({ item }) => (
               <View style={styles.card}>
@@ -450,5 +649,129 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 15,
     letterSpacing: 0.2,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  progressModal: {
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.large,
+    padding: androidUI.spacing.lg,
+    width: '80%',
+    alignItems: 'center',
+    ...androidUI.cardShadow,
+  },
+  progressHeader: {
+    alignItems: 'center',
+    marginBottom: androidUI.spacing.md,
+  },
+  progressTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    marginTop: androidUI.spacing.sm,
+  },
+  fileName: {
+    fontSize: 14,
+    color: androidUI.colors.text.secondary,
+    marginTop: androidUI.spacing.xs,
+  },
+  progressBarContainer: {
+    width: '100%',
+    marginBottom: androidUI.spacing.md,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: ACCENT,
+    borderRadius: 5,
+  },
+  progressText: {
+    fontSize: 14,
+    color: androidUI.colors.text.primary,
+    fontWeight: '600',
+  },
+  statusText: {
+    fontSize: 16,
+    color: androidUI.colors.text.primary,
+    marginBottom: androidUI.spacing.md,
+    textAlign: 'center',
+  },
+  resultsContainer: {
+    width: '100%',
+    marginTop: androidUI.spacing.md,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: androidUI.spacing.xs,
+  },
+  resultLabel: {
+    fontSize: 14,
+    color: androidUI.colors.text.secondary,
+  },
+  resultValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+  },
+  warningsContainer: {
+    width: '100%',
+    marginTop: androidUI.spacing.md,
+  },
+  warningsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF9800',
+    marginBottom: androidUI.spacing.xs,
+  },
+  warningsList: {
+    maxHeight: 100, // Limit height for scrollable warnings
+    overflow: 'hidden',
+  },
+  warningText: {
+    fontSize: 13,
+    color: '#FF9800',
+    marginBottom: 2,
+  },
+  errorsContainer: {
+    width: '100%',
+    marginTop: androidUI.spacing.md,
+  },
+  errorsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    marginBottom: androidUI.spacing.xs,
+  },
+  errorsList: {
+    maxHeight: 100, // Limit height for scrollable errors
+    overflow: 'hidden',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#F44336',
+    marginBottom: 2,
+  },
+  closeButton: {
+    backgroundColor: ACCENT,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    borderRadius: androidUI.borderRadius.medium,
+    marginTop: androidUI.spacing.md,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 }); 

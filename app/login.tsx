@@ -47,12 +47,21 @@ export default function LoginScreen() {
         await AsyncStorage.removeItem('userRole');
         await AsyncStorage.removeItem('userId');
         await AsyncStorage.removeItem('userName');
-      } catch {
-        // ignore
+      } catch (error: any) {
+        // Clear invalid tokens and show appropriate message if needed
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('userRole');
+        await AsyncStorage.removeItem('userId');
+        await AsyncStorage.removeItem('userName');
+        
+        // Only show error toast for network issues, not for expired tokens
+        if (error.message && error.message.includes('Network error')) {
+          showToast('Network error. Please check your connection', 'error');
+        }
       }
     };
     checkLoginStatus();
-  }, [connect]);
+  }, [connect, showToast]);
 
   useEffect(() => {
     Animated.spring(logoAnim, {
@@ -68,6 +77,7 @@ export default function LoginScreen() {
       showToast('Please enter phone number and password', 'error');
       return;
     }
+    
     // Animate button
     Animated.sequence([
       Animated.timing(buttonAnim, {
@@ -91,8 +101,12 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('userName', data.name);
         if (data.userId) await AsyncStorage.setItem('userId', data.userId);
         
-        // Show success toast
-        showToast(`Welcome back, ${data.name}!`, 'success');
+        // Show success toast with role-specific message
+        const roleMessage = data.role === 'Admin' ? 'Welcome back, Admin!' : 
+                           data.role === 'Staff' ? 'Welcome back, Staff!' :
+                           data.role === 'Executive' ? 'Welcome back, Executive!' :
+                           `Welcome back, ${data.name}!`;
+        showToast(roleMessage, 'success');
         
         // Establish WebSocket connection after successful login
         // Small delay to ensure token is properly stored
@@ -104,10 +118,12 @@ export default function LoginScreen() {
           router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
         }, 1500);
       } else {
-        showToast('Invalid phone number or password', 'error');
+        showToast('Login failed. Please try again', 'error');
       }
-    } catch (err) {
-      showToast('Could not connect to server', 'error');
+    } catch (err: any) {
+      // Show specific error message from the enhanced error handling
+      const errorMessage = err.message || 'Login failed. Please try again';
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }

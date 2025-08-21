@@ -46,13 +46,38 @@ api.interceptors.response.use(
 );
 
 export const login = async (phone: string, password: string) => {
-  const response = await api.post('/login', { phone, password });
-  if (response.data.token) {
-    await AsyncStorage.setItem('token', response.data.token);
-    await AsyncStorage.setItem('userRole', response.data.role);
-    if (response.data.userId) await AsyncStorage.setItem('userId', response.data.userId);
+  try {
+    const response = await api.post('/login', { phone, password });
+    if (response.data.token) {
+      await AsyncStorage.setItem('token', response.data.token);
+      await AsyncStorage.setItem('userRole', response.data.role);
+      if (response.data.userId) await AsyncStorage.setItem('userId', response.data.userId);
+    }
+    return response.data;
+  } catch (error: any) {
+    // Enhanced error handling with specific messages
+    if (error.response) {
+      // Server responded with error status
+      const status = error.response.status;
+      const message = error.response.data?.message || 'Login failed';
+      
+      if (status === 401) {
+        throw new Error('Invalid phone number or password');
+      } else if (status === 400) {
+        throw new Error('Please check your input and try again');
+      } else if (status === 500) {
+        throw new Error('Server error. Please try again later');
+      } else {
+        throw new Error(message);
+      }
+    } else if (error.request) {
+      // Network error - no response received
+      throw new Error('No internet connection. Please check your network and try again');
+    } else {
+      // Other errors
+      throw new Error('Login failed. Please try again');
+    }
   }
-  return response.data;
 };
 
 export const logout = async () => {
@@ -141,7 +166,20 @@ export const validateToken = async () => {
   try {
     const res = await api.get('/login/validate');
     return res.data;
-  } catch (e) {
-    throw e;
+  } catch (error: any) {
+    // Enhanced error handling for token validation
+    if (error.response) {
+      const status = error.response.status;
+      if (status === 401) {
+        throw new Error('Session expired. Please login again');
+      } else if (status === 404) {
+        throw new Error('User not found. Please login again');
+      } else if (status === 500) {
+        throw new Error('Server error during validation');
+      }
+    } else if (error.request) {
+      throw new Error('Network error during validation');
+    }
+    throw error;
   }
 };
