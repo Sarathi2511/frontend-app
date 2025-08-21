@@ -124,6 +124,13 @@ export const deleteOrder = (orderId: string) => api.delete(`/orders/by-order-id/
 
 export const getOrdersAssignedTo = (userId: string) => api.get(`/orders/assigned/${userId}`);
 
+// Stock management API functions
+export const cancelOrder = (orderId: string, reason?: string) => 
+  api.post(`/orders/cancel/${orderId}`, { reason });
+
+export const getOrderStockStatus = (orderId: string) => 
+  api.get(`/orders/stock-status/${orderId}`);
+
 export const getCurrentUserId = async () => {
   return await AsyncStorage.getItem('userId');
 };

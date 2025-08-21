@@ -1,18 +1,25 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert, Image } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert, Image, Modal, TextInput } from "react-native";
 import { useEffect, useState } from "react";
-import { getOrders } from "../api";
+import { getOrders, cancelOrder, getOrderStockStatus } from "../api";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
+import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [stockStatus, setStockStatus] = useState<any[]>([]);
+  const [loadingStock, setLoadingStock] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -22,6 +29,8 @@ export default function OrderDetailsScreen() {
           const foundOrder = response.data.find((o: any) => o.orderId === id);
           if (foundOrder) {
             setOrder(foundOrder);
+            // Fetch stock status for the order
+            fetchStockStatus(foundOrder.orderId);
           } else {
             setOrder(null);
           }
@@ -34,6 +43,39 @@ export default function OrderDetailsScreen() {
       fetchOrder();
     }
   }, [id]);
+
+  const fetchStockStatus = async (orderId: string) => {
+    setLoadingStock(true);
+    try {
+      const response = await getOrderStockStatus(orderId);
+      setStockStatus(response.data.stockStatus || []);
+    } catch (err) {
+      console.error('Failed to fetch stock status:', err);
+    }
+    setLoadingStock(false);
+  };
+
+  const handleCancelOrder = async () => {
+    if (!order) return;
+    
+    setCancelling(true);
+    try {
+      await cancelOrder(order.orderId, cancellationReason);
+      showToast('Order cancelled successfully', 'success');
+      setShowCancelModal(false);
+      setCancellationReason('');
+      // Refresh order data
+      const response = await getOrders();
+      const updatedOrder = response.data.find((o: any) => o.orderId === order.orderId);
+      if (updatedOrder) {
+        setOrder(updatedOrder);
+      }
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || 'Failed to cancel order';
+      showToast(errorMessage, 'error');
+    }
+    setCancelling(false);
+  };
 
   if (loading) return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
@@ -188,6 +230,76 @@ export default function OrderDetailsScreen() {
               <Text style={styles.noItemsText}>No items in this order.</Text>
             )}
           </View>
+
+          {/* Stock Status */}
+          {stockStatus.length > 0 && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('📊', 'Stock Status')}
+              {loadingStock ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color={ACCENT} />
+                  <Text style={styles.loadingText}>Checking stock availability...</Text>
+                </View>
+              ) : (
+                <View style={styles.stockStatusContainer}>
+                  {stockStatus.map((item: any, idx: number) => (
+                    <View key={idx} style={styles.stockStatusItem}>
+                      <View style={styles.stockStatusHeader}>
+                        <Text style={styles.stockProductName}>{item.productName}</Text>
+                        <View style={[
+                          styles.stockStatusBadge,
+                          item.sufficient ? styles.stockSufficient : styles.stockInsufficient
+                        ]}>
+                          <Text style={[
+                            styles.stockStatusText,
+                            item.sufficient ? styles.stockSufficientText : styles.stockInsufficientText
+                          ]}>
+                            {item.sufficient ? '✓ Sufficient' : '✗ Insufficient'}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.stockDetails}>
+                        <Text style={styles.stockDetailText}>
+                          Required: <Text style={styles.stockDetailValue}>{item.requiredQuantity}</Text>
+                        </Text>
+                        <Text style={styles.stockDetailText}>
+                          Available: <Text style={[
+                            styles.stockDetailValue,
+                            item.lowStock ? styles.lowStockText : null
+                          ]}>{item.availableStock}</Text>
+                          {item.lowStock && <Text style={styles.lowStockIndicator}> (Low Stock)</Text>}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Cancellation Info */}
+          {order.status === 'cancelled' && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('❌', 'Cancellation Details')}
+              <Detail label="Cancelled By" value={order.cancelledBy || 'Unknown'} />
+              <Detail label="Cancelled At" value={order.cancelledAt ? new Date(order.cancelledAt).toLocaleString() : 'Unknown'} />
+              <Detail label="Reason" value={order.cancellationReason || 'No reason provided'} />
+            </View>
+          )}
+
+          {/* Action Buttons */}
+          {order.status !== 'cancelled' && order.orderStatus !== 'Dispatched' && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('⚡', 'Actions')}
+              <Pressable 
+                style={styles.cancelButton}
+                onPress={() => setShowCancelModal(true)}
+              >
+                <Ionicons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.cancelButtonText}>Cancel Order</Text>
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
         <View style={styles.stickyTotalCard}>
           <Text style={styles.stickyTotalLabel}>Order Total</Text>
@@ -196,6 +308,59 @@ export default function OrderDetailsScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Cancellation Modal */}
+      <Modal
+        visible={showCancelModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCancelModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Cancel Order</Text>
+            <Text style={styles.modalSubtitle}>
+              Are you sure you want to cancel this order? This action will restore the stock quantities.
+            </Text>
+            
+            <View style={styles.reasonInputContainer}>
+              <Text style={styles.reasonLabel}>Cancellation Reason (Optional):</Text>
+              <TextInput
+                style={styles.reasonInput}
+                value={cancellationReason}
+                onChangeText={setCancellationReason}
+                placeholder="Enter reason for cancellation..."
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+
+            <View style={styles.modalButtons}>
+              <Pressable 
+                style={styles.modalButtonSecondary}
+                onPress={() => {
+                  setShowCancelModal(false);
+                  setCancellationReason('');
+                }}
+                disabled={cancelling}
+              >
+                <Text style={styles.modalButtonSecondaryText}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={[styles.modalButtonPrimary, cancelling && styles.modalButtonDisabled]}
+                onPress={handleCancelOrder}
+                disabled={cancelling}
+              >
+                {cancelling ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonPrimaryText}>Confirm Cancellation</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -472,5 +637,178 @@ const styles = StyleSheet.create({
     borderColor: '#e0e0e0',
     backgroundColor: '#f3f6fa',
     marginBottom: 8,
+  },
+  // Stock Status Styles
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  loadingText: {
+    marginLeft: 8,
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  stockStatusContainer: {
+    gap: 12,
+  },
+  stockStatusItem: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#e9ecef',
+  },
+  stockStatusHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  stockProductName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#22223b',
+    flex: 1,
+  },
+  stockStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  stockSufficient: {
+    backgroundColor: '#d4edda',
+  },
+  stockInsufficient: {
+    backgroundColor: '#f8d7da',
+  },
+  stockStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  stockSufficientText: {
+    color: '#155724',
+  },
+  stockInsufficientText: {
+    color: '#721c24',
+  },
+  stockDetails: {
+    gap: 4,
+  },
+  stockDetailText: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  stockDetailValue: {
+    fontWeight: '600',
+    color: '#22223b',
+  },
+  lowStockText: {
+    color: '#ff9800',
+  },
+  lowStockIndicator: {
+    color: '#ff9800',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  // Cancellation Button Styles
+  cancelButton: {
+    backgroundColor: '#dc3545',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#22223b',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  reasonInputContainer: {
+    marginBottom: 24,
+  },
+  reasonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#22223b',
+    marginBottom: 8,
+  },
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 14,
+    color: '#22223b',
+    backgroundColor: '#f8f9fa',
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButtonSecondary: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+  },
+  modalButtonSecondaryText: {
+    color: '#22223b',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonPrimary: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: '#dc3545',
+    alignItems: 'center',
+  },
+  modalButtonPrimaryText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalButtonDisabled: {
+    opacity: 0.6,
   },
 }); 

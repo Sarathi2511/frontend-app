@@ -69,6 +69,7 @@ export default function EditOrderScreen() {
   const [editingItem, setEditingItem] = useState<any>(null);
   const [editQty, setEditQty] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [stockErrors, setStockErrors] = useState<string[]>([]);
 
   // Fetch staff list
   useEffect(() => {
@@ -373,6 +374,13 @@ export default function EditOrderScreen() {
       router.back();
     } catch (err: any) {
       console.error('Update failed:', err.response?.data || err.message);
+      
+      // Handle stock validation errors
+      if (err.response?.data?.stockErrors && Array.isArray(err.response.data.stockErrors)) {
+        setStockErrors(err.response.data.stockErrors);
+        showToast('Insufficient stock for some products. Please check the details below.', 'error');
+        return;
+      }
       
       // Show detailed error message
       const errorMessage = err.response?.data?.message || 
@@ -788,6 +796,29 @@ export default function EditOrderScreen() {
                     ₹{Math.round(orderItems.reduce((sum, item) => sum + item.total, 0))}
                   </Text>
                 </View>
+              </View>
+            )}
+
+            {/* Stock Errors Display */}
+            {stockErrors.length > 0 && (
+              <View style={styles.stockErrorsContainer}>
+                <View style={styles.stockErrorsHeader}>
+                  <Ionicons name="warning" size={20} color="#dc3545" />
+                  <Text style={styles.stockErrorsTitle}>Stock Validation Errors</Text>
+                </View>
+                <View style={styles.stockErrorsList}>
+                  {stockErrors.map((error, index) => (
+                    <View key={index} style={styles.stockErrorItem}>
+                      <Text style={styles.stockErrorText}>• {error}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Pressable 
+                  style={styles.clearErrorsButton}
+                  onPress={() => setStockErrors([])}
+                >
+                  <Text style={styles.clearErrorsButtonText}>Clear Errors</Text>
+                </Pressable>
               </View>
             )}
           </View>
@@ -1424,5 +1455,48 @@ const styles = StyleSheet.create({
   },
   dropdownScrollView: {
     maxHeight: 200,
+  },
+  // Stock Errors Styles
+  stockErrorsContainer: {
+    backgroundColor: '#fff3cd',
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.lg,
+    marginTop: androidUI.spacing.md,
+  },
+  stockErrorsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: androidUI.spacing.sm,
+  },
+  stockErrorsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#856404',
+    marginLeft: androidUI.spacing.sm,
+  },
+  stockErrorsList: {
+    marginBottom: androidUI.spacing.md,
+  },
+  stockErrorItem: {
+    marginBottom: 4,
+  },
+  stockErrorText: {
+    fontSize: 14,
+    color: '#856404',
+    lineHeight: 20,
+  },
+  clearErrorsButton: {
+    backgroundColor: '#856404',
+    paddingVertical: androidUI.spacing.sm,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderRadius: androidUI.borderRadius.small,
+    alignSelf: 'flex-start',
+  },
+  clearErrorsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 }); 

@@ -402,7 +402,15 @@ export default function ProductsScreen() {
                   </View>
                   <View style={styles.infoGroup}>
                     <Text style={styles.infoLabel}>Stock</Text>
-                    <Text style={styles.infoValue}>{item.stockQuantity}</Text>
+                    <Text style={[
+                      styles.infoValue,
+                      item.stockQuantity <= item.lowStockThreshold && styles.lowStockValue
+                    ]}>
+                      {item.stockQuantity}
+                      {item.stockQuantity <= item.lowStockThreshold && (
+                        <Text style={styles.lowStockIndicator}> ⚠️</Text>
+                      )}
+                    </Text>
                   </View>
                   <View style={styles.infoGroup}>
                     <Text style={styles.infoLabel}>Dimension</Text>
@@ -773,5 +781,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  // Low Stock Styles
+  lowStockValue: {
+    color: '#ff9800',
+    fontWeight: '700',
+  },
+  lowStockIndicator: {
+    color: '#ff9800',
+    fontSize: 12,
   },
 }); 

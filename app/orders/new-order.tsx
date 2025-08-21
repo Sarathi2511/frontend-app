@@ -313,8 +313,25 @@ export default function NewOrderScreen() {
           router.replace({ pathname: '/orders/orders', params: { role: params.role, name: params.name } });
         });
       }
-    } catch (err) {
-      Alert.alert("Error", "Failed to create order");
+    } catch (err: any) {
+      console.error('Order creation failed:', err.response?.data || err.message);
+      
+      // Handle stock validation errors
+      if (err.response?.data?.stockErrors && Array.isArray(err.response.data.stockErrors)) {
+        const errorMessage = err.response.data.stockErrors.join('\n• ');
+        Alert.alert(
+          "Insufficient Stock", 
+          `The following products have insufficient stock:\n\n• ${errorMessage}\n\nPlease adjust quantities or remove items with insufficient stock.`
+        );
+        return;
+      }
+      
+      // Handle other errors
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error || 
+                         err.message || 
+                         'Failed to create order';
+      Alert.alert("Error", errorMessage);
     }
     setCreating(false);
   };
