@@ -101,6 +101,9 @@ const styles = StyleSheet.create({
     borderRadius: androidUI.borderRadius.large,
     backgroundColor: '#f3f6fa',
   },
+  customerNameRow: {
+    marginBottom: 6,
+  },
   cardRowMid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -111,6 +114,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flexShrink: 0,
   },
   statusChip: {
     flexDirection: 'row',
@@ -160,6 +164,8 @@ const styles = StyleSheet.create({
     color: ACCENT,
     marginBottom: 4,
     marginTop: 2,
+    flexWrap: 'wrap',
+    lineHeight: 20,
   },
   orderRoute: {
     fontSize: 14,
@@ -167,6 +173,8 @@ const styles = StyleSheet.create({
     color: androidUI.colors.text.secondary,
     marginBottom: 4,
     marginTop: 2,
+    flex: 1,
+    marginRight: 8,
   },
   created: {
     fontSize: 13,
@@ -1392,9 +1400,13 @@ export default function OrdersScreen() {
                 />
               </Pressable>
               </View>
-              {/* Line 2: Name and status chips */}
+              {/* Line 2: Customer Name */}
+              <View style={styles.customerNameRow}>
+                <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
+              </View>
+              
+              {/* Line 3: Route and Status chips */}
               <View style={styles.cardRowMid}>
-                <Text style={styles.customerName}>{item.customerName}</Text>
                 {item.orderRoute && (
                   <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
                 )}

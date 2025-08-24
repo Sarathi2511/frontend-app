@@ -1,6 +1,6 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView } from "react-native";
+import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, Keyboard } from "react-native";
 import { getProducts } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import { useOrder } from "./OrderContext";
@@ -19,7 +19,23 @@ export default function OrderItemsScreen() {
   const [price, setPrice] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchDisabled, setSearchDisabled] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const params = useLocalSearchParams();
+
+  // Keyboard event listeners
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+    });
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      keyboardDidShowListener?.remove();
+      keyboardDidHideListener?.remove();
+    };
+  }, []);
 
   // If coming back from new-product, auto-search and select
   useEffect(() => {
@@ -119,127 +135,151 @@ export default function OrderItemsScreen() {
     router.back();
   };
 
-  return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <View style={styles.screenWrap}>
-        <View style={styles.headerBar}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={ACCENT} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Add Order Items</Text>
-        </View>
-        <ScrollView contentContainerStyle={styles.container}>
-          {/* Search/Add Product */}
-          <Text style={styles.floatingLabel}>Search Product</Text>
-          <TextInput
-            style={[
-              styles.input,
-              styles.productSearchInput,
-              searchFocused && styles.productSearchInputFocused
-            ]}
-            placeholder="Search products by name or dimension"
-            value={productSearch}
-            onChangeText={handleProductSearch}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setSearchFocused(false)}
-            autoFocus
-            editable={!searchDisabled}
-          />
-          {!selectedProduct && productSearch.trim().length > 0 && productResults.length === 0 && (
-            <View style={{ alignItems: 'center', marginTop: 24 }}>
-              <Text style={{ color: '#b0b3b8', marginBottom: 12 }}>No products found.</Text>
-              <Pressable style={styles.createProductBtn} onPress={() => router.push({ pathname: '/products/new-product', params: { returnTo: 'orderitems', productName: productSearch } })}>
-                <Text style={styles.createProductBtnText}>Create Product</Text>
-              </Pressable>
-            </View>
-          )}
-          {!selectedProduct && productSearch.trim().length > 0 && productResults.length > 0 && (
-            <View style={{ maxHeight: 180, marginBottom: 12, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e0e0e0', overflow: 'hidden' }}>
-              {productResults.map((item: any) => (
-                <Pressable
-                  key={item._id}
-                  style={({ pressed }) => [styles.productResultRow, selectedProduct && selectedProduct._id === item._id && styles.productResultRowSelected, pressed && { opacity: 0.7 }]}
-                  onPress={() => handleSelectProduct(item)}
-                >
-                  <Text style={styles.productResultName}>{item.name}</Text>
-                  <Text style={styles.productResultDim}>{item.dimension}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-          {selectedProduct && (
-            <View style={styles.selectedProductFormWrap}>
-              <Text style={styles.floatingLabel}>Product</Text>
-              <View style={styles.selectedProductNameBox}>
-                <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
-              </View>
-              <View style={styles.formFieldSpacing} />
-              <Text style={styles.floatingLabel}>QTY</Text>
-              <TextInput
-                style={styles.input}
-                value={qty}
-                onChangeText={setQty}
-                keyboardType="numeric"
-                placeholder="Enter quantity"
-                placeholderTextColor="#b0b3b8"
-              />
-              <View style={styles.formFieldSpacing} />
-              <Text style={styles.floatingLabel}>Price</Text>
-              <TextInput
-                style={styles.input}
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="numeric"
-                placeholder="Enter price"
-                placeholderTextColor="#b0b3b8"
-              />
-              <View style={styles.formFieldSpacing} />
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
-                <Text style={{ fontWeight: '600', color: ACCENT, fontSize: 15 }}>Total: {qty && price ? Number(qty) * Number(price) : 0}</Text>
-              </View>
-              <Pressable style={styles.addProductBtn} onPress={handleAddProduct}>
-                <Ionicons name="add-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
-                <Text style={styles.addProductBtnText}>Add to Order</Text>
-              </Pressable>
-              <Pressable style={[styles.addProductBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e53935', marginTop: 8 }]} onPress={() => { setSelectedProduct(null); setQty(""); setPrice(""); setSearchDisabled(false); }}>
-                <Ionicons name="close-circle-outline" size={20} color="#e53935" style={{ marginRight: 6 }} />
-                <Text style={[styles.addProductBtnText, { color: '#e53935' }]}>Cancel</Text>
-              </Pressable>
-            </View>
-          )}
-          {/* List of Order Items */}
-          {orderItems.length > 0 && (
-            <View style={{ marginBottom: 18 }}>
-              {orderItems.map((item: any, idx: number) => (
-                <View key={idx} style={styles.orderItemCard}>
-                  <View style={styles.orderItemCardTopRow}>
-                    <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
-                    <Pressable style={styles.removeOrderItemBtn} onPress={() => handleRemoveOrderItem(idx)}>
-                      <Ionicons name="close-circle" size={20} color="#e53935" />
-                    </Pressable>
-                  </View>
-                  <View style={styles.orderItemCardMidRow}>
-                    <Text style={styles.orderItemMeta}>Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text></Text>
-                    <Text style={styles.orderItemMeta}>| Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text></Text>
-                  </View>
-                  <View style={styles.orderItemCardBotRow}>
-                    <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
-                  </View>
-                </View>
-              ))}
-              <View style={styles.orderItemsFooterCard}>
-                <Text style={styles.orderItemsFooterTotalLabel}>Total</Text>
-                <Text style={styles.orderItemsFooterTotalValue}>₹{orderTotal}</Text>
-              </View>
-            </View>
-          )}
-          {orderItems.length > 0 && (
-            <Pressable style={styles.addProductBtn} onPress={handleReturn}>
-              <Ionicons name="checkmark-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
-              <Text style={styles.addProductBtnText}>Done</Text>
-            </Pressable>
-          )}
-        </ScrollView>
+     return (
+     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+       <View style={styles.screenWrap}>
+         <View style={styles.headerBar}>
+           <Pressable style={styles.backBtn} onPress={() => router.back()}>
+             <Ionicons name="arrow-back" size={22} color={ACCENT} />
+           </Pressable>
+           <Text style={styles.headerTitle}>Add Order Items</Text>
+         </View>
+         <ScrollView 
+           contentContainerStyle={styles.container}
+           keyboardShouldPersistTaps="handled"
+           showsVerticalScrollIndicator={false}
+         >
+           {/* Search/Add Product */}
+           <Text style={styles.floatingLabel}>Search Product</Text>
+           <TextInput
+             style={[
+               styles.input,
+               styles.productSearchInput,
+               searchFocused && styles.productSearchInputFocused
+             ]}
+             placeholder="Search products by name or dimension"
+             value={productSearch}
+             onChangeText={handleProductSearch}
+             onFocus={() => setSearchFocused(true)}
+             onBlur={() => setSearchFocused(false)}
+             autoFocus
+             editable={!searchDisabled}
+           />
+           {!selectedProduct && productSearch.trim().length > 0 && productResults.length === 0 && (
+             <View style={{ alignItems: 'center', marginTop: 24 }}>
+               <Text style={{ color: '#b0b3b8', marginBottom: 12 }}>No products found.</Text>
+               <Pressable style={styles.createProductBtn} onPress={() => router.push({ pathname: '/products/new-product', params: { returnTo: 'orderitems', productName: productSearch } })}>
+                 <Text style={styles.createProductBtnText}>Create Product</Text>
+               </Pressable>
+             </View>
+           )}
+           {!selectedProduct && productSearch.trim().length > 0 && productResults.length > 0 && (
+             <View style={{ 
+               marginBottom: 12, 
+               backgroundColor: '#fff', 
+               borderRadius: 10, 
+               borderWidth: 1, 
+               borderColor: '#e0e0e0', 
+               overflow: 'hidden',
+               zIndex: 1000,
+               elevation: 5,
+               maxHeight: keyboardVisible ? 200 : 250,
+               position: 'relative'
+             }}>
+               <ScrollView
+                 style={{ maxHeight: keyboardVisible ? 180 : 230 }}
+                 showsVerticalScrollIndicator={true}
+                 nestedScrollEnabled={true}
+                 keyboardShouldPersistTaps="handled"
+                 bounces={false}
+                 contentContainerStyle={{ flexGrow: 1 }}
+               >
+                 {productResults.map((item: any) => (
+                   <Pressable
+                     key={item._id}
+                     style={({ pressed }) => [styles.productResultRow, selectedProduct && selectedProduct._id === item._id && styles.productResultRowSelected, pressed && { opacity: 0.7 }]}
+                     onPress={() => handleSelectProduct(item)}
+                   >
+                     <Text style={styles.productResultName}>{item.name}</Text>
+                     <Text style={styles.productResultDim}>{item.dimension}</Text>
+                   </Pressable>
+                 ))}
+               </ScrollView>
+             </View>
+           )}
+           {selectedProduct && (
+             <View style={styles.selectedProductFormWrap}>
+               <Text style={styles.floatingLabel}>Product</Text>
+               <View style={styles.selectedProductNameBox}>
+                 <Text style={styles.selectedProductName}>{selectedProduct.name}</Text>
+               </View>
+               <View style={styles.formFieldSpacing} />
+               <Text style={styles.floatingLabel}>QTY</Text>
+               <TextInput
+                 style={styles.input}
+                 value={qty}
+                 onChangeText={setQty}
+                 keyboardType="numeric"
+                 placeholder="Enter quantity"
+                 placeholderTextColor="#b0b3b8"
+               />
+               <View style={styles.formFieldSpacing} />
+               <Text style={styles.floatingLabel}>Price</Text>
+               <TextInput
+                 style={styles.input}
+                 value={price}
+                 onChangeText={setPrice}
+                 keyboardType="numeric"
+                 placeholder="Enter price"
+                 placeholderTextColor="#b0b3b8"
+               />
+               <View style={styles.formFieldSpacing} />
+               <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10, marginBottom: 10 }}>
+                 <Text style={{ fontWeight: '600', color: ACCENT, fontSize: 15 }}>Total: {qty && price ? Number(qty) * Number(price) : 0}</Text>
+               </View>
+               <Pressable style={styles.addProductBtn} onPress={handleAddProduct}>
+                 <Ionicons name="add-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
+                 <Text style={styles.addProductBtnText}>Add to Order</Text>
+               </Pressable>
+               <Pressable style={[styles.addProductBtn, { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e53935', marginTop: 8 }]} onPress={() => { setSelectedProduct(null); setQty(""); setPrice(""); setSearchDisabled(false); }}>
+                 <Ionicons name="close-circle-outline" size={20} color="#e53935" style={{ marginRight: 6 }} />
+                 <Text style={[styles.addProductBtnText, { color: '#e53935' }]}>Cancel</Text>
+               </Pressable>
+             </View>
+           )}
+           {/* List of Order Items */}
+           {orderItems.length > 0 && (
+             <View style={{ marginBottom: 18 }}>
+               {orderItems.map((item: any, idx: number) => (
+                 <View key={idx} style={styles.orderItemCard}>
+                   <View style={styles.orderItemCardTopRow}>
+                     <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                     <Pressable style={styles.removeOrderItemBtn} onPress={() => handleRemoveOrderItem(idx)}>
+                       <Ionicons name="close-circle" size={20} color="#e53935" />
+                     </Pressable>
+                   </View>
+                   <View style={styles.orderItemCardMidRow}>
+                     <Text style={styles.orderItemMeta}>Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text></Text>
+                     <Text style={styles.orderItemMeta}>| Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text></Text>
+                   </View>
+                   <View style={styles.orderItemCardBotRow}>
+                     <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
+                   </View>
+                 </View>
+               ))}
+               <View style={styles.orderItemsFooterCard}>
+                 <Text style={styles.orderItemsFooterTotalLabel}>Total</Text>
+                 <Text style={styles.orderItemsFooterTotalValue}>₹{orderTotal}</Text>
+               </View>
+             </View>
+           )}
+           {orderItems.length > 0 && (
+             <Pressable style={styles.addProductBtn} onPress={handleReturn}>
+               <Ionicons name="checkmark-circle-outline" size={20} color={ACCENT} style={{ marginRight: 6 }} />
+               <Text style={styles.addProductBtnText}>Done</Text>
+             </Pressable>
+           )}
+         </ScrollView>
       </View>
     </KeyboardAvoidingView>
   );
@@ -276,12 +316,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     fontFamily: androidUI.fontFamily.medium,
   },
-  container: {
-    paddingVertical: 32,
-    paddingHorizontal: androidUI.spacing.lg,
-    minHeight: 400,
-    flexGrow: 1,
-  },
+           container: {
+        paddingVertical: 32,
+        paddingHorizontal: androidUI.spacing.lg,
+        minHeight: 400,
+        flexGrow: 1,
+      },
   floatingLabel: {
     fontSize: 13,
     color: androidUI.colors.text.disabled,
