@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   chipGroup: {
     flexDirection: 'row',
@@ -175,6 +175,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     flex: 1,
     marginRight: 8,
+  },
+  orderCardTotal: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    marginBottom: 4,
+    marginTop: 2,
   },
   created: {
     fontSize: 13,
@@ -1386,65 +1393,61 @@ export default function OrdersScreen() {
               ]}
               onPress={() => router.push({ pathname: '/orders/orderdetails', params: { id: item.orderId, role } })}
             >
-              {/* Line 1: Order ID and menu icon */}
+              {/* Line 1: Order ID and Three Dots */}
               <View style={styles.cardRowTop}>
                 <Text style={styles.orderId}>{item.orderId}</Text>
-              <Pressable 
-                style={[styles.menuIconBtn, expandedOrderId === item._id && styles.menuIconBtnActive]} 
-                onPress={() => handleMenu(item)}
-              >
-                <Ionicons 
-                  name={expandedOrderId === item._id ? "chevron-up" : "ellipsis-vertical"} 
-                  size={20} 
-                  color={expandedOrderId === item._id ? "#3D5AFE" : "#b0b3b8"} 
-                />
-              </Pressable>
-              </View>
-              {/* Line 2: Customer Name */}
-              <View style={styles.customerNameRow}>
-                <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
+                <Pressable 
+                  style={[styles.menuIconBtn, expandedOrderId === item._id && styles.menuIconBtnActive]} 
+                  onPress={() => handleMenu(item)}
+                >
+                  <Ionicons 
+                    name={expandedOrderId === item._id ? "chevron-up" : "ellipsis-vertical"} 
+                    size={20} 
+                    color={expandedOrderId === item._id ? "#3D5AFE" : "#b0b3b8"} 
+                  />
+                </Pressable>
               </View>
               
-              {/* Line 3: Route and Status chips */}
+              {/* Line 2: Customer Name and Order Status */}
+              <View style={styles.cardRowMid}>
+                <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
+                <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+                  <Ionicons
+                    name={
+                      item.orderStatus === 'Pending' ? 'time-outline' :
+                      item.orderStatus === 'Invoice' ? 'document-text-outline' :
+                      item.orderStatus === 'Dispatched' ? 'send-outline' :
+                      item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+                    }
+                    size={14}
+                    color={item.orderStatus === 'Pending' ? '#b8860b' :
+                           item.orderStatus === 'Invoice' ? '#388e3c' :
+                           item.orderStatus === 'Dispatched' ? '#8e24aa' :
+                           item.orderStatus === 'DC' ? '#1976d2' : '#222'}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+                </View>
+              </View>
+              
+              {/* Line 3: Order Route and Urgent Badge */}
               <View style={styles.cardRowMid}>
                 {item.orderRoute && (
                   <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
                 )}
-                <View style={styles.chipGroup}>
-                  <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
-                    <Ionicons
-                      name={
-                        item.orderStatus === 'Pending' ? 'time-outline' :
-                        item.orderStatus === 'Invoice' ? 'document-text-outline' :
-                        item.orderStatus === 'Dispatched' ? 'send-outline' :
-                        item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-                      }
-                      size={14}
-                      color={item.orderStatus === 'Pending' ? '#b8860b' :
-                             item.orderStatus === 'Invoice' ? '#388e3c' :
-                             item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                             item.orderStatus === 'DC' ? '#1976d2' : '#222'}
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+                {item.urgent && (
+                  <View style={[styles.statusChip, styles.urgentChip]}>
+                    <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
+                    <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
                   </View>
-                  {item.urgent && (
-                    <View style={[styles.statusChip, styles.urgentChip]}>
-                      <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-                      <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-                    </View>
-                  )}
-                </View>
+                )}
               </View>
-              {/* Line 2.5: Total Price */}
-              <View style={{ marginTop: 4, marginBottom: 2 }}>
+              
+              {/* Line 4: Total Amount and Payment Due Badge */}
+              <View style={styles.cardRowMid}>
                 <Text style={styles.orderCardTotal}>
                   Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
                 </Text>
-              </View>
-              {/* Line 3: Created date and payment chip */}
-              <View style={styles.cardRowBot}>
-                <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
                 {item.paymentMarkedBy && item.paymentRecievedBy ? (
                   <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
                     <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
@@ -1456,6 +1459,11 @@ export default function OrdersScreen() {
                     <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
                   </View>
                 ) : null}
+              </View>
+              
+              {/* Line 5: Created At Date */}
+              <View style={styles.cardRowBot}>
+                <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
               </View>
               
               {/* Inline Action Menu */}

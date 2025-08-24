@@ -25,16 +25,15 @@ export default function Welcome() {
       })
     ).start();
 
-    // On landing, auto-route based on token validity
+    // On landing, clear any invalid tokens but don't auto-navigate
     const bootstrap = async () => {
       try {
         const token = await AsyncStorage.getItem('token');
         const role = await AsyncStorage.getItem('userRole');
-        const name = await AsyncStorage.getItem('userName');
         if (token && role) {
-          // Verify token with backend; if invalid, clear and stay
+          // Verify token with backend; if invalid, clear
           await validateToken();
-          router.replace({ pathname: "./dashboard", params: { role, name: name || 'User' } });
+          // Don't auto-navigate - let the login screen handle navigation
         }
       } catch {
         // invalid token; ensure cleared

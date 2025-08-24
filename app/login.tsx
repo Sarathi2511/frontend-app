@@ -20,25 +20,30 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [showDemo, setShowDemo] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const router = useRouter();
   const logoAnim = useState(new Animated.Value(0))[0];
   const buttonAnim = useRef(new Animated.Value(1)).current;
   const { connect } = useSocket();
   const { showToast } = useToast();
 
-  // Check if user is already logged in
+  // Check if user is already logged in - but don't auto-navigate
   useEffect(() => {
     const checkLoginStatus = async () => {
+      // Don't check login status if user is actively logging in
+      if (isLoggingIn) return;
+      
       try {
         const token = await AsyncStorage.getItem('token');
         const role = await AsyncStorage.getItem('userRole');
         const name = await AsyncStorage.getItem('userName');
         if (token && role) {
-          // Validate token with backend
+          // Validate token with backend - but don't navigate
           const { success } = await (await import('./api')).validateToken();
           if (success) {
-            await connect();
-            router.replace({ pathname: "./dashboard", params: { role, name } });
+            // Don't auto-navigate - let the user manually log in
+            // await connect();
+            // router.replace({ pathname: "./dashboard", params: { role, name } });
             return;
           }
         }
@@ -61,7 +66,7 @@ export default function LoginScreen() {
       }
     };
     checkLoginStatus();
-  }, [connect, showToast]);
+  }, [showToast, isLoggingIn]); // Removed connect from dependencies
 
   useEffect(() => {
     Animated.spring(logoAnim, {
@@ -94,6 +99,7 @@ export default function LoginScreen() {
     ]).start();
 
     setLoading(true);
+    setIsLoggingIn(true);
     try {
       const data = await login(phone, password);
       if (data.token) {
@@ -101,22 +107,18 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('userName', data.name);
         if (data.userId) await AsyncStorage.setItem('userId', data.userId);
         
-        // Show success toast with role-specific message
+        // Establish WebSocket connection after successful login
+        await connect();
+        
+        // Navigate immediately to dashboard
+        router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
+        
+        // Show success toast with role-specific message after navigation
         const roleMessage = data.role === 'Admin' ? 'Welcome back, Admin!' : 
                            data.role === 'Staff' ? 'Welcome back, Staff!' :
                            data.role === 'Executive' ? 'Welcome back, Executive!' :
                            `Welcome back, ${data.name}!`;
         showToast(roleMessage, 'success');
-        
-        // Establish WebSocket connection after successful login
-        // Small delay to ensure token is properly stored
-        await new Promise(resolve => setTimeout(resolve, 100));
-        await connect();
-        
-        // Navigate after a short delay to show the toast
-        setTimeout(() => {
-          router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
-        }, 1500);
       } else {
         showToast('Login failed. Please try again', 'error');
       }
@@ -126,6 +128,7 @@ export default function LoginScreen() {
       showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
+      setIsLoggingIn(false);
     }
   };
 
