@@ -167,6 +167,7 @@ export const getExecutives = () => api.get('/staff').then(res => res.data.filter
 export const getCustomerNames = () => api.get('/orders/customers');
 export const getOrderRoutes = () => api.get('/orders/routes'); 
 export const getCustomers = () => api.get('/customers');
+export const getCustomerByName = (name: string) => api.get(`/customers/by-name/${encodeURIComponent(name)}`);
 
 // Token validation (lightweight check used on app start/resume)
 export const validateToken = async () => {

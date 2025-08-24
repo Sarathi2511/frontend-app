@@ -380,7 +380,7 @@ export default function ProductsScreen() {
               <View style={styles.card}>
                 {/* Top Row: Product Name and Menu Icon */}
                 <View style={styles.cardRowTop}>
-                  <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
+                  <Text style={styles.productName}>{item.name}</Text>
                   <Pressable 
                     style={[styles.menuIconBtn, expandedProductId === item._id && styles.menuIconBtnActive]} 
                     onPress={() => handleMenuToggle(item._id)}
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   cardRowTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 8,
   },
   menuIconBtn: {
@@ -544,6 +544,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     marginTop: 2,
     flex: 1,
+    flexWrap: 'wrap',
+    paddingRight: 8,
   },
   infoGroup: {
     marginRight: 24,

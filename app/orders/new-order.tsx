@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 // @ts-ignore
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes } from "../api";
+import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../api";
 import { useOrder } from "./OrderContext";
+import { useToast } from "../contexts/ToastContext";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
@@ -30,6 +31,7 @@ interface OrderItem {
 export default function NewOrderScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -72,8 +74,6 @@ export default function NewOrderScreen() {
 
   const [statusChevronAnim] = useState(new Animated.Value(0));
   const [assignedChevronAnim] = useState(new Animated.Value(0));
-  const [showToast, setShowToast] = useState(false);
-  const toastAnim = useRef(new Animated.Value(0)).current;
 
   const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
@@ -81,6 +81,7 @@ export default function NewOrderScreen() {
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [customerNameFocused, setCustomerNameFocused] = useState(false);
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [customerDetailsLoading, setCustomerDetailsLoading] = useState(false);
 
   // Route suggestions state
   const [routeSuggestions, setRouteSuggestions] = useState<string[]>([]);
@@ -266,6 +267,41 @@ export default function NewOrderScreen() {
     if (routeFocused) fetchRouteSuggestions();
   }, [form.orderRoute, routeFocused]);
 
+  // Function to handle customer selection and auto-fill details
+  const handleCustomerSelection = async (customerName: string) => {
+    setCustomerDetailsLoading(true);
+    try {
+      const response = await getCustomerByName(customerName);
+      const customer = response.data;
+      
+      if (customer) {
+        setForm(prev => ({
+          ...prev,
+          customerName: customer.name,
+          customerPhone: customer.phone || '',
+          address: customer.address || ''
+        }));
+        
+        // Show success message if details were auto-filled
+        if (customer.phone || customer.address) {
+          showToast('Customer details auto-filled successfully!', 'success');
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching customer details:', err);
+      // If customer details can't be fetched, just set the name
+      setForm(prev => ({
+        ...prev,
+        customerName: customerName
+      }));
+      
+      // Show info message
+      showToast('Customer details not found. Please fill manually.', 'info');
+    } finally {
+      setCustomerDetailsLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     // Validate required fields
     const requiredFields = [
@@ -301,18 +337,9 @@ export default function NewOrderScreen() {
         ...(scheduledFor ? { scheduledFor: scheduledFor.toISOString() } : {}),
         ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
       });
-      if (isMounted.current) {
-        setShowToast(true);
-        Animated.timing(toastAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }).start(() => {
-          setShowToast(false);
-          toastAnim.setValue(0);
-          router.replace({ pathname: '/orders/orders', params: { role: params.role, name: params.name } });
-        });
-      }
+             if (isMounted.current) {
+         router.replace({ pathname: '/orders/orders', params: { role: params.role, name: params.name } });
+       }
     } catch (err: any) {
       console.error('Order creation failed:', err.response?.data || err.message);
       
@@ -453,7 +480,7 @@ export default function NewOrderScreen() {
                               pressed && { opacity: 0.7 }
                             ]}
                             onPress={() => {
-                              handleChange('customerName', name);
+                              handleCustomerSelection(name);
                               setCustomerDropdownOpen(false);
                             }}
                           >
@@ -512,9 +539,13 @@ export default function NewOrderScreen() {
                     value={form.customerPhone}
                     onChangeText={v => handleChange('customerPhone', v)}
                     keyboardType="phone-pad"
-                    placeholder="Enter phone number"
+                    placeholder={customerDetailsLoading ? "Loading..." : "Enter phone number"}
                     placeholderTextColor="#b0b3b8"
+                    editable={!customerDetailsLoading}
                   />
+                  {customerDetailsLoading && (
+                    <ActivityIndicator size="small" color={ACCENT} style={{ marginRight: 12 }} />
+                  )}
                 </View>
               </View>
               <View style={styles.floatingLabelInputWrap}>
@@ -525,10 +556,14 @@ export default function NewOrderScreen() {
                     style={styles.input}
                     value={form.address}
                     onChangeText={v => handleChange('address', v)}
-                    placeholder="Enter address"
+                    placeholder={customerDetailsLoading ? "Loading..." : "Enter address"}
                     placeholderTextColor="#b0b3b8"
                     multiline
+                    editable={!customerDetailsLoading}
                   />
+                  {customerDetailsLoading && (
+                    <ActivityIndicator size="small" color={ACCENT} style={{ marginRight: 12 }} />
+                  )}
                 </View>
               </View>
               <View style={styles.floatingLabelInputWrap}>
@@ -881,24 +916,8 @@ export default function NewOrderScreen() {
               <Text style={styles.orderCancelBtnText}>Cancel</Text>
             </Pressable>
           </ScrollView>
-        </View>
-        {showToast && (
-          <Animated.View
-            style={[
-              styles.toast,
-              {
-                opacity: toastAnim,
-                transform: [
-                  { translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }
-                ]
-              }
-            ]}
-            pointerEvents="none"
-          >
-            <Text style={styles.toastText}>✅ Order Created Successfully!</Text>
-          </Animated.View>
-        )}
-      </KeyboardAvoidingView>
+                 </View>
+       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -1528,29 +1547,11 @@ orderCancelBtnText: {
     borderWidth: 1.5,
     borderColor: '#106eea',
   },
-  ghostAddProductBtnText: {
-    color: '#106eea',
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  toast: {
-    position: 'absolute',
-    left: androidUI.spacing.xxl,
-    right: androidUI.spacing.xxl,
-    bottom: 48,
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.large,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.cardShadow,
-    alignItems: 'center',
-  },
-  toastText: {
-    color: ACCENT,
-    fontWeight: '700',
-    fontSize: 16,
-    textAlign: 'center',
-  },
+     ghostAddProductBtnText: {
+     color: '#106eea',
+     fontWeight: '700',
+     fontSize: 15,
+   },
   inlineDropdown: {
     position: 'absolute',
     top: '100%',
