@@ -14,11 +14,11 @@ const ACCENT = "#3D5AFE";
 
 const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
 
-// Define valid status transitions for strict workflow
+// Define valid status transitions for flexible workflow
 const getValidNextStatuses = (currentStatus: string): string[] => {
   const validTransitions = {
     'Pending': ['DC'],
-    'DC': ['Invoice'],
+    'DC': ['Invoice', 'Dispatched'], // Allow both Invoice and Dispatched from DC
     'Invoice': ['Dispatched'],
     'Dispatched': [] // Final state, no further transitions
   };

@@ -158,6 +158,7 @@ export default function OrderItemsScreen() {
                searchFocused && styles.productSearchInputFocused
              ]}
              placeholder="Search products by name or dimension"
+             placeholderTextColor="#b0b3b8"
              value={productSearch}
              onChangeText={handleProductSearch}
              onFocus={() => setSearchFocused(true)}
