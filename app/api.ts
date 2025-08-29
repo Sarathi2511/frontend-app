@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 // const BASE_URL = 'http://192.168.29.111:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
@@ -32,13 +33,35 @@ api.interceptors.response.use(
   (error) => {
     // If token expired or unauthorized, clear auth and bubble up
     if (error?.response?.status === 401) {
-      AsyncStorage.removeItem('token');
-      AsyncStorage.removeItem('userRole');
-      AsyncStorage.removeItem('userId');
-      AsyncStorage.removeItem('userName');
-      try {
-        router.replace('/login');
-      } catch {}
+      console.log('Token expired or unauthorized - clearing auth data and redirecting to login');
+      
+      // Show user-friendly alert before redirecting
+      Alert.alert(
+        'Session Expired',
+        'Your session has expired. Please login again to continue.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Clear auth data
+              AsyncStorage.removeItem('token');
+              AsyncStorage.removeItem('userRole');
+              AsyncStorage.removeItem('userId');
+              AsyncStorage.removeItem('userName');
+              
+              // Force redirect to login with a small delay to ensure cleanup
+              setTimeout(() => {
+                try {
+                  router.replace('/login');
+                } catch (redirectError) {
+                  console.error('Failed to redirect to login:', redirectError);
+                }
+              }, 100);
+            }
+          }
+        ],
+        { cancelable: false }
+      );
     }
     console.error('Response Error:', error);
     return Promise.reject(error);

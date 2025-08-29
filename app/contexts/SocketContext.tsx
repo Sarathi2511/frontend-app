@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotifications } from './NotificationContext';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -81,12 +82,36 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         // If auth failed (expired/invalid token), perform logout flow
         const message = String(error?.message || '').toLowerCase();
         if (message.includes('auth') || message.includes('token')) {
-          await AsyncStorage.removeItem('token');
-          await AsyncStorage.removeItem('userRole');
-          await AsyncStorage.removeItem('userId');
-          await AsyncStorage.removeItem('userName');
-          try { newSocket.disconnect(); } catch {}
-          router.replace('/login');
+          console.log('Socket auth error - clearing auth data and redirecting to login');
+          
+          // Show user-friendly alert before redirecting
+          Alert.alert(
+            'Connection Expired',
+            'Your connection has expired. Please login again to continue.',
+            [
+              {
+                text: 'OK',
+                onPress: async () => {
+                  // Clear auth data
+                  await AsyncStorage.removeItem('token');
+                  await AsyncStorage.removeItem('userRole');
+                  await AsyncStorage.removeItem('userId');
+                  await AsyncStorage.removeItem('userName');
+                  try { newSocket.disconnect(); } catch {}
+                  
+                  // Force redirect to login with a small delay
+                  setTimeout(() => {
+                    try {
+                      router.replace('/login');
+                    } catch (redirectError) {
+                      console.error('Failed to redirect to login from socket:', redirectError);
+                    }
+                  }, 100);
+                }
+              }
+            ],
+            { cancelable: false }
+          );
         }
       });
 
