@@ -62,6 +62,9 @@ export default function NewOrderScreen() {
   const [qty, setQty] = useState("");
   const [price, setPrice] = useState("");
   const [showProductSearch, setShowProductSearch] = useState(false);
+  
+  // Partial fulfillment state
+  const [selectedItems, setSelectedItems] = useState<boolean[]>([]);
 
   // Add a flag to track if we are returning from new-product
   const [reopenProductModal, setReopenProductModal] = useState(false);
@@ -319,8 +322,21 @@ export default function NewOrderScreen() {
       Alert.alert("Error", `Please fill in the ${emptyField.label}.`);
       return;
     }
+
+    // Check if at least one item is selected
+    const hasSelectedItems = selectedItems.some(selected => selected);
+    if (!hasSelectedItems) {
+      Alert.alert("Error", "Please select at least one item to include in the order.");
+      return;
+    }
+
     setCreating(true);
     try {
+      // Convert boolean array to indices array for backend
+      const selectedIndices = selectedItems
+        .map((selected, index) => selected ? index : -1)
+        .filter(index => index !== -1);
+
       await createOrder({
         customerName: form.customerName,
         orderRoute: form.orderRoute,
@@ -332,7 +348,8 @@ export default function NewOrderScreen() {
         assignedToId: form.assignedToId,
         createdBy: params.name ? String(params.name) : "Unknown",
         urgent: form.urgent,
-        orderItems: orderItems,
+        orderItems: orderItems, // Send all items
+        selectedItems: selectedIndices, // Send indices of selected items
         orderImage: form.orderImage || '',
         ...(scheduledFor ? { scheduledFor: scheduledFor.toISOString() } : {}),
         ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
@@ -375,6 +392,11 @@ export default function NewOrderScreen() {
   useEffect(() => {
     clearOrderItems();
   }, []);
+
+  // Initialize selectedItems when orderItems change
+  useEffect(() => {
+    setSelectedItems(new Array(orderItems.length).fill(true));
+  }, [orderItems]);
 
   // Add handlers for editing and deleting items
   const handleEditItem = (item: any, index: number) => {
@@ -437,6 +459,13 @@ export default function NewOrderScreen() {
         }
       ]
     );
+  };
+
+  // Handle checkbox toggle for partial fulfillment
+  const handleItemToggle = (index: number) => {
+    const newSelectedItems = [...selectedItems];
+    newSelectedItems[index] = !newSelectedItems[index];
+    setSelectedItems(newSelectedItems);
   };
 
   return (
@@ -795,9 +824,28 @@ export default function NewOrderScreen() {
                 <>
                   <View style={{ marginBottom: 18 }}>
                     {orderItems.map((item: any, idx: number) => (
-                      <View key={idx} style={styles.orderItemCard}>
+                      <View key={idx} style={[
+                        styles.orderItemCard,
+                        !selectedItems[idx] && styles.orderItemCardUnselected
+                      ]}>
                         <View style={styles.orderItemHeader}>
-                          <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                          <View style={styles.orderItemCheckboxContainer}>
+                            <Pressable 
+                              style={[
+                                styles.orderItemCheckbox,
+                                selectedItems[idx] && styles.orderItemCheckboxSelected
+                              ]}
+                              onPress={() => handleItemToggle(idx)}
+                            >
+                              {selectedItems[idx] && (
+                                <Ionicons name="checkmark" size={16} color="#fff" />
+                              )}
+                            </Pressable>
+                            <Text style={[
+                              styles.orderItemName,
+                              !selectedItems[idx] && styles.orderItemNameUnselected
+                            ]} numberOfLines={1}>{item.name}</Text>
+                          </View>
                           <View style={styles.orderItemActions}>
                             <Pressable 
                               style={[styles.itemActionButton, { marginRight: 8 }]}
@@ -814,27 +862,40 @@ export default function NewOrderScreen() {
                           </View>
                         </View>
                         <View style={styles.orderItemDetails}>
-                          <Text style={styles.orderItemMeta}>
+                          <Text style={[
+                            styles.orderItemMeta,
+                            !selectedItems[idx] && styles.orderItemMetaUnselected
+                          ]}>
                             Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text>
                           </Text>
-                          <Text style={styles.orderItemMeta}>
+                          <Text style={[
+                            styles.orderItemMeta,
+                            !selectedItems[idx] && styles.orderItemMetaUnselected
+                          ]}>
                             Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text>
                           </Text>
                           {item.dimension && (
-                            <Text style={styles.orderItemMeta}>
+                            <Text style={[
+                              styles.orderItemMeta,
+                              !selectedItems[idx] && styles.orderItemMetaUnselected
+                            ]}>
                               {item.dimension}
                             </Text>
                           )}
                         </View>
                         <View style={styles.orderItemFooter}>
-                          <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
+                          <Text style={[
+                            styles.orderItemTotal,
+                            !selectedItems[idx] && styles.orderItemTotalUnselected
+                          ]}>Total: ₹{item.total}</Text>
                         </View>
                       </View>
                     ))}
                     <View style={styles.orderTotalCard}>
                       <Text style={styles.orderTotalLabel}>Order Total</Text>
                       <Text style={styles.orderTotalValue}>
-                        ₹{orderItems.reduce((sum: number, item: OrderItem) => sum + item.total, 0)}
+                        ₹{orderItems.reduce((sum: number, item: OrderItem, index: number) => 
+                          sum + (selectedItems[index] ? item.total : 0), 0)}
                       </Text>
                     </View>
                   </View>
@@ -1599,5 +1660,41 @@ orderCancelBtnText: {
   },
   dropdownScrollView: {
     maxHeight: 200,
+  },
+  // Checkbox styles for partial fulfillment
+  orderItemCheckboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: androidUI.spacing.sm,
+  },
+  orderItemCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: androidUI.spacing.sm,
+  },
+  orderItemCheckboxSelected: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+  },
+  orderItemCardUnselected: {
+    opacity: 0.6,
+    backgroundColor: '#f8f9fa',
+  },
+  orderItemNameUnselected: {
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
+  orderItemMetaUnselected: {
+    color: '#999',
+  },
+  orderItemTotalUnselected: {
+    color: '#999',
   },
 }); 

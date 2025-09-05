@@ -1430,17 +1430,25 @@ export default function OrdersScreen() {
                 </View>
               </View>
               
-              {/* Line 3: Order Route and Urgent Badge */}
+              {/* Line 3: Order Route and Badges */}
               <View style={styles.cardRowMid}>
                 {item.orderRoute && (
                   <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
                 )}
-                {item.urgent && (
-                  <View style={[styles.statusChip, styles.urgentChip]}>
-                    <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-                  </View>
-                )}
+                <View style={styles.chipGroup}>
+                  {item.isPartialOrder && (
+                    <View style={[styles.statusChip, { backgroundColor: '#fff3cd', borderColor: '#fff3cd' }]}>
+                      <Ionicons name="warning" size={14} color="#b8860b" style={{ marginRight: 4 }} />
+                      <Text style={[styles.statusChipText, { color: '#b8860b' }]}>Partially</Text>
+                    </View>
+                  )}
+                  {item.urgent && (
+                    <View style={[styles.statusChip, styles.urgentChip]}>
+                      <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
+                      <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
+                    </View>
+                  )}
+                </View>
               </View>
               
               {/* Line 4: Total Amount and Payment Due Badge */}

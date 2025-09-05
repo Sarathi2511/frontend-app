@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-// const BASE_URL = 'http://192.168.29.111:5000/api';
+// const BASE_URL = 'http://192.168.0.107:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
 
 const api = axios.create({
@@ -191,6 +191,19 @@ export const getCustomerNames = () => api.get('/orders/customers');
 export const getOrderRoutes = () => api.get('/orders/routes'); 
 export const getCustomers = () => api.get('/customers');
 export const getCustomerByName = (name: string) => api.get(`/customers/by-name/${encodeURIComponent(name)}`);
+
+// Partial fulfillment API functions
+export const createOrderWithPartialFulfillment = (data: any) => 
+  api.post('/orders', data);
+
+export const getPartialOrderDetails = (orderId: string) => 
+  api.get(`/orders/partial-details/${orderId}`);
+
+export const completePartialOrder = (orderId: string, itemsToAdd: any[]) => 
+  api.put(`/orders/by-order-id/${orderId}`, { 
+    completePartialOrder: true, 
+    itemsToAdd 
+  });
 
 // Token validation (lightweight check used on app start/resume)
 export const validateToken = async () => {

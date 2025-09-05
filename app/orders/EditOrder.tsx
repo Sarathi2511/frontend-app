@@ -70,6 +70,11 @@ export default function EditOrderScreen() {
   const [editQty, setEditQty] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [stockErrors, setStockErrors] = useState<string[]>([]);
+  
+  // Partial order completion state
+  const [isPartialOrder, setIsPartialOrder] = useState(false);
+  const [partialItems, setPartialItems] = useState<any[]>([]);
+  const [showPartialCompletionModal, setShowPartialCompletionModal] = useState(false);
 
   // Fetch staff list
   useEffect(() => {
@@ -135,6 +140,10 @@ export default function EditOrderScreen() {
               additionalNotes: order.additionalNotes || '',
             });
             setOrderItems(order.orderItems || []);
+            
+            // Handle partial order data
+            setIsPartialOrder(order.isPartialOrder || false);
+            setPartialItems(order.partialItems || []);
           }
         } catch (err) {
           Alert.alert("Error", "Failed to fetch order details");
@@ -330,6 +339,39 @@ export default function EditOrderScreen() {
         }
       ]
     );
+  };
+
+  // Handle partial order completion
+  const handleCompletePartialOrder = async () => {
+    if (!id) {
+      Alert.alert("Error", "Invalid order ID");
+      return;
+    }
+
+    if (partialItems.length === 0) {
+      Alert.alert("Error", "No partial items to complete");
+      return;
+    }
+
+    setUpdating(true);
+    try {
+      const response = await updateOrder(id as string, {
+        completePartialOrder: true,
+        itemsToAdd: partialItems
+      });
+      
+      Alert.alert("Success", "Partial order completed successfully!");
+      router.back();
+    } catch (err: any) {
+      console.error('Partial order completion failed:', err.response?.data || err.message);
+      const errorMessage = err.response?.data?.message || 
+                         err.response?.data?.error || 
+                         err.message || 
+                         'Failed to complete partial order';
+      Alert.alert("Error", errorMessage);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -822,6 +864,66 @@ export default function EditOrderScreen() {
               </View>
             )}
           </View>
+
+          {/* Partial Order Completion Section */}
+          {isPartialOrder && partialItems.length > 0 && (
+            <>
+              <View style={styles.sectionDivider} />
+              <View style={styles.sectionGroup}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.floatingLabel}>Complete Partial Order</Text>
+                  <View style={styles.partialOrderBadge}>
+                    <Ionicons name="warning" size={16} color="#b8860b" />
+                    <Text style={styles.partialOrderBadgeText}>Partial</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.partialOrderInfo}>
+                  <Text style={styles.partialOrderInfoText}>
+                    This order has {partialItems.length} item(s) that were not included in the initial fulfillment.
+                  </Text>
+                </View>
+
+                <View style={styles.partialItemsList}>
+                  {partialItems.map((item, index) => (
+                    <View key={index} style={styles.partialItemCard}>
+                      <View style={styles.partialItemHeader}>
+                        <Text style={styles.partialItemName}>{item.name}</Text>
+                        <Text style={styles.partialItemStatus}>Pending</Text>
+                      </View>
+                      <View style={styles.partialItemDetails}>
+                        <Text style={styles.partialItemMeta}>
+                          Qty: <Text style={styles.partialItemMetaValue}>{item.qty}</Text>
+                        </Text>
+                        <Text style={styles.partialItemMeta}>
+                          Price: <Text style={styles.partialItemMetaValue}>₹{item.price}</Text>
+                        </Text>
+                        {item.dimension && (
+                          <Text style={styles.partialItemMeta}>
+                            {item.dimension}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={styles.partialItemFooter}>
+                        <Text style={styles.partialItemTotal}>Total: ₹{item.total}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                <Pressable 
+                  style={styles.completePartialOrderButton}
+                  onPress={handleCompletePartialOrder}
+                  disabled={updating}
+                >
+                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                  <Text style={styles.completePartialOrderButtonText}>
+                    {updating ? 'Completing...' : 'Complete Partial Order'}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
 
           {/* Product Search Modal */}
           <Modal
@@ -1498,5 +1600,110 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // Partial order completion styles
+  partialOrderBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3cd',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  partialOrderBadgeText: {
+    color: '#b8860b',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  partialOrderInfo: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: androidUI.borderRadius.small,
+    padding: androidUI.spacing.md,
+    marginBottom: androidUI.spacing.lg,
+    borderLeftWidth: 4,
+    borderLeftColor: '#b8860b',
+  },
+  partialOrderInfoText: {
+    color: androidUI.colors.text.secondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  partialItemsList: {
+    marginBottom: androidUI.spacing.lg,
+  },
+  partialItemCard: {
+    backgroundColor: '#fff3cd',
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.lg,
+    marginBottom: androidUI.spacing.md,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  partialItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  partialItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#b8860b',
+    flex: 1,
+    marginRight: androidUI.spacing.sm,
+  },
+  partialItemStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#b8860b',
+    backgroundColor: '#ffeaa7',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  partialItemDetails: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 12,
+  },
+  partialItemMeta: {
+    fontSize: 14,
+    color: '#b8860b',
+  },
+  partialItemMetaValue: {
+    color: '#b8860b',
+    fontWeight: '600',
+  },
+  partialItemFooter: {
+    borderTopWidth: 1,
+    borderTopColor: '#ffeaa7',
+    paddingTop: androidUI.spacing.md,
+    alignItems: 'flex-end',
+  },
+  partialItemTotal: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#b8860b',
+  },
+  completePartialOrderButton: {
+    backgroundColor: '#28a745',
+    borderRadius: androidUI.borderRadius.large,
+    paddingVertical: 14,
+    paddingHorizontal: androidUI.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...androidUI.cardShadow,
+    shadowColor: '#28a745',
+  },
+  completePartialOrderButtonText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+    marginLeft: 8,
   },
 }); 
