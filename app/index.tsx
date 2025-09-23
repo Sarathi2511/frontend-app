@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "./utils/androidUI";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { validateToken } from './api';
+import { validateToken } from './utils/api';
 
 const { width, height } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";

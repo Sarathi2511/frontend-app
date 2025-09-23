@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
-import { deleteStaff, getStaff } from "../api";
+import { deleteStaff, getStaff } from "../utils/api";
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
@@ -318,7 +318,6 @@ const styles = StyleSheet.create({
     borderRadius: androidUI.borderRadius.large,
     backgroundColor: '#f3f6fa',
     marginLeft: androidUI.spacing.sm,
-    transition: 'all 0.2s ease',
   },
   menuIconBtnActive: {
     backgroundColor: '#e3eaff',

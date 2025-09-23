@@ -162,6 +162,7 @@ export const getCurrentUserId = async () => {
 export const getProducts = () => api.get('/products');
 export const createProduct = (data: any) => api.post('/products', data);
 export const updateProduct = (id: string, data: any) => api.put(`/products/${id}`, data);
+export const updateProductStock = (id: string, stockToAdd: number) => api.patch(`/products/${id}/stock`, { stockToAdd });
 export const deleteProduct = (id: string) => api.delete(`/products/${id}`);
 export const getBrands = () => api.get('/products/brands');
 

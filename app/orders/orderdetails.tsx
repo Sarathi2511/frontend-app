@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert, Image, Modal, TextInput } from "react-native";
 import { useEffect, useState } from "react";
-import { getOrders, cancelOrder, getOrderStockStatus } from "../api";
+import { getOrders, cancelOrder, getOrderStockStatus } from "../utils/api";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";

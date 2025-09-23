@@ -90,4 +90,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
       {children}
     </NotificationContext.Provider>
   );
-}; 
+};
+
+// Default export to prevent Expo Router warnings
+export default NotificationProvider; 

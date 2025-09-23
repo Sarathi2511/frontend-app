@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 // import * as ScreenOrientation from 'expo-screen-orientation';
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Modal, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
-import { getCurrentUserId, getOrdersAssignedTo, logout } from './api';
+import { getCurrentUserId, getOrdersAssignedTo, logout } from './utils/api';
 import NotificationButton from './components/NotificationButton';
 import { androidUI } from './utils/androidUI';
 

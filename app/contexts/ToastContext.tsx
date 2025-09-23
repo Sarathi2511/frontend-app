@@ -38,4 +38,7 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       />
     </ToastContext.Provider>
   );
-}; 
+};
+
+// Default export to prevent Expo Router warnings
+export default ToastProvider; 

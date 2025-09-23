@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
 import RNModal from 'react-native-modal';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../api";
+import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useLocalSearchParams } from "expo-router";

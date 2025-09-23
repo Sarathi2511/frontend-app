@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Pressable, Platform, Dimensions } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { getOrders, getProducts, getExecutives, getCustomers, getBrands } from "./api";
+import { getOrders, getProducts, getExecutives, getCustomers, getBrands } from "./utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from "react-native-chart-kit";
 import { androidUI } from "./utils/androidUI";

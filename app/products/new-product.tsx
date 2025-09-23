@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, SafeAreaView, Animated } from "react-native";
-import { createProduct, getBrands } from "../api";
+import { createProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";

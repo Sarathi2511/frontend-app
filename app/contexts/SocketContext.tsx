@@ -257,4 +257,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       {children}
     </SocketContext.Provider>
   );
-}; 
+};
+
+// Default export to prevent Expo Router warnings
+export default SocketProvider; 

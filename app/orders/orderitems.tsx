@@ -1,7 +1,7 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View, ActivityIndicator, Alert, KeyboardAvoidingView, ScrollView, Keyboard } from "react-native";
-import { getProducts } from "../api";
+import { getProducts } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useOrder } from "./OrderContext";
 import { androidUI } from "../utils/androidUI";

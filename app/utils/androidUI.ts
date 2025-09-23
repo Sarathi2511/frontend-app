@@ -91,4 +91,7 @@ export const createStyles = (styleObject: any) => {
 // Helper for Android-specific adjustments
 export const androidAdjustment = (iosValue: any, androidValue: any) => {
   return Platform.OS === 'ios' ? iosValue : androidValue;
-}; 
+};
+
+// Default export to prevent Expo Router warnings
+export default androidUI; 

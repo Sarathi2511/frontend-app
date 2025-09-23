@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState, useRef } from "react";
 import { Alert, Animated, Dimensions, Image, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, LayoutAnimation, UIManager } from "react-native";
-import { login } from "./api";
+import { login } from "./utils/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "./contexts/SocketContext";
@@ -11,9 +11,8 @@ import { useToast } from "./contexts/ToastContext";
 const { width, height } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+// Layout animation is now enabled by default in React Native
+// No need for setLayoutAnimationEnabledExperimental
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState("");
@@ -39,7 +38,7 @@ export default function LoginScreen() {
         const name = await AsyncStorage.getItem('userName');
         if (token && role) {
           // Validate token with backend - but don't navigate
-          const { success } = await (await import('./api')).validateToken();
+          const { success } = await (await import('./utils/api')).validateToken();
           if (success) {
             // Don't auto-navigate - let the user manually log in
             // await connect();

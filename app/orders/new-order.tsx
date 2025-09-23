@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 // @ts-ignore
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../api";
+import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../utils/api";
 import { useOrder } from "./OrderContext";
 import { useToast } from "../contexts/ToastContext";
 import { androidUI } from "../utils/androidUI";

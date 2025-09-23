@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, ActivityIndicator, Alert, Animated, SafeAreaView } from "react-native";
-import { getProducts, updateProduct, getBrands } from "../api";
+import { getProducts, updateProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
@@ -499,5 +499,29 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontWeight: '700',
     fontSize: 15,
+  },
+  inlineDropdown: {
+    position: 'absolute',
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.medium,
+    borderWidth: 1,
+    borderColor: androidUI.colors.border,
+    ...androidUI.shadow,
+    maxHeight: 200,
+    zIndex: 1000,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+  inlineDropdownOption: {
+    paddingVertical: androidUI.spacing.md,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: androidUI.colors.border,
+  },
+  inlineDropdownOptionText: {
+    color: androidUI.colors.text.primary,
+    fontSize: 16,
+    fontFamily: androidUI.fontFamily.regular,
   },
 }); 

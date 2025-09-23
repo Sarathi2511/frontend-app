@@ -1,8 +1,8 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrder } from "../api";
+import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrder } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useSocket } from "../contexts/SocketContext";
@@ -658,6 +658,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: androidUI.colors.text.primary,
+  },
+  orderRoute: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: androidUI.colors.text.secondary,
+    marginRight: androidUI.spacing.sm,
   },
   chipGroup: {
     flexDirection: 'row',

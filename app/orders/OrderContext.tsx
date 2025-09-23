@@ -19,4 +19,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
 
 export function useOrder() {
   return useContext(OrderContext);
-} 
+}
+
+// Default export to prevent Expo Router warnings
+export default OrderProvider; 
