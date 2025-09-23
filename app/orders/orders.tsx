@@ -1,8 +1,9 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
+import RNModal from 'react-native-modal';
 import { useFocusEffect } from '@react-navigation/native';
-import { getOrders, updateOrder, deleteOrder, getStaff } from "../api";
+import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../api";
 import { Ionicons } from '@expo/vector-icons';
 import DropDownPicker from 'react-native-dropdown-picker';
 import { useLocalSearchParams } from "expo-router";
@@ -176,7 +177,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  orderCardTotal: {
+  orderCardTotalRegular: {
     fontSize: 15,
     fontWeight: '600',
     color: androidUI.colors.text.primary,
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     fontFamily: androidUI.fontFamily.medium,
   },
-  orderCardTotal: {
+  orderCardTotalBold: {
     fontSize: 15,
     fontWeight: '700',
     color: androidUI.colors.text.primary,
@@ -847,6 +848,196 @@ function getStatusStyle(status: string) {
   }
 }
 
+// Memoized Order Card Component for better performance
+const OrderCard = memo(({ 
+  item, 
+  expandedOrderId, 
+  showStatusOptions, 
+  animatedHeight, 
+  userRole, 
+  onPress, 
+  onMenuPress, 
+  onSelectStatus, 
+  getMenuOptions, 
+  getValidNextStatuses 
+}: {
+  item: any;
+  expandedOrderId: string | null;
+  showStatusOptions: string | null;
+  animatedHeight: Animated.Value;
+  userRole: string;
+  onPress: () => void;
+  onMenuPress: () => void;
+  onSelectStatus: (status: string) => void;
+  getMenuOptions: () => MenuOption[];
+  getValidNextStatuses: (status: string) => string[];
+}) => {
+  const isExpanded = expandedOrderId === item._id;
+  const showStatus = showStatusOptions === item._id;
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        pressed && styles.cardPressed
+      ]}
+      onPress={onPress}
+    >
+      {/* Line 1: Order ID and Three Dots */}
+      <View style={styles.cardRowTop}>
+        <Text style={styles.orderId}>{item.orderId}</Text>
+        <Pressable 
+          style={[styles.menuIconBtn, isExpanded && styles.menuIconBtnActive]} 
+          onPress={onMenuPress}
+        >
+          <Ionicons 
+            name={isExpanded ? "chevron-up" : "ellipsis-vertical"} 
+            size={20} 
+            color={isExpanded ? "#3D5AFE" : "#b0b3b8"} 
+          />
+        </Pressable>
+      </View>
+      
+      {/* Line 2: Customer Name and Order Status */}
+      <View style={styles.cardRowMid}>
+        <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
+        <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+          <Ionicons
+            name={
+              item.orderStatus === 'Pending' ? 'time-outline' :
+              item.orderStatus === 'Invoice' ? 'document-text-outline' :
+              item.orderStatus === 'Dispatched' ? 'send-outline' :
+              item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+            }
+            size={14}
+            color={item.orderStatus === 'Pending' ? '#b8860b' :
+                   item.orderStatus === 'Invoice' ? '#388e3c' :
+                   item.orderStatus === 'Dispatched' ? '#8e24aa' :
+                   item.orderStatus === 'DC' ? '#1976d2' : '#222'}
+            style={{ marginRight: 4 }}
+          />
+          <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+        </View>
+      </View>
+      
+      {/* Line 3: Order Route and Badges */}
+      <View style={styles.cardRowMid}>
+        {item.orderRoute && (
+          <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
+        )}
+        <View style={styles.chipGroup}>
+          {item.isPartialOrder && (
+            <View style={[styles.statusChip, { backgroundColor: '#fff3cd', borderColor: '#fff3cd' }]}>
+              <Ionicons name="warning" size={14} color="#b8860b" style={{ marginRight: 4 }} />
+              <Text style={[styles.statusChipText, { color: '#b8860b' }]}>Partially</Text>
+            </View>
+          )}
+          {item.urgent && (
+            <View style={[styles.statusChip, styles.urgentChip]}>
+              <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
+              <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      
+      {/* Line 4: Total Amount and Payment Due Badge */}
+      <View style={styles.cardRowMid}>
+        <Text style={styles.orderCardTotalRegular}>
+          Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
+        </Text>
+        {item.paymentMarkedBy && item.paymentRecievedBy ? (
+          <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
+            <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
+            <Text style={[styles.statusChipText, { color: '#43a047' }]}>Paid</Text>
+          </View>
+        ) : item.paymentCondition === 'Immediate' ? (
+          <View style={[styles.statusChip, styles.paymentChip]}>
+            <Ionicons name="card" size={14} color="#ff5252" style={{ marginRight: 4 }} />
+            <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
+          </View>
+        ) : null}
+      </View>
+      
+      {/* Line 5: Created At Date */}
+      <View style={styles.cardRowBot}>
+        <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
+      </View>
+      
+      {/* Inline Action Menu */}
+      {isExpanded && (
+        <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
+          <View style={styles.actionGrid}>
+            {showStatus ? (
+              // Show only valid next status options
+              getValidNextStatuses(item.orderStatus).map((status) => (
+                <Pressable
+                  key={status}
+                  style={[styles.actionButton, styles.statusButton]}
+                  onPress={() => onSelectStatus(status)}
+                >
+                  <Ionicons
+                    name={
+                      status === 'Pending' ? 'time-outline' :
+                      status === 'DC' ? 'cube-outline' :
+                      status === 'Invoice' ? 'document-text-outline' :
+                      status === 'Dispatched' ? 'send-outline' : 'ellipse-outline'
+                    }
+                    size={20}
+                    color="#3D5AFE"
+                    style={styles.actionButtonIcon}
+                  />
+                  <Text style={[styles.actionButtonText, styles.statusButtonText]}>
+                    {status}
+                  </Text>
+                </Pressable>
+              ))
+            ) : (
+              // Show regular menu options
+              getMenuOptions().map((option) => (
+                <Pressable
+                  key={option.key}
+                  style={[
+                    styles.actionButton,
+                    option.disabled && styles.actionButtonDisabled,
+                    option.destructive && styles.actionButtonDestructive
+                  ]}
+                  onPress={option.disabled ? undefined : option.action}
+                  disabled={option.disabled}
+                >
+                  <Ionicons
+                    name={
+                      option.key === 'view' ? 'eye-outline' :
+                      option.key === 'print' ? 'print-outline' :
+                      option.key === 'edit' ? 'create-outline' :
+                      option.key === 'status' ? 'swap-horizontal' :
+                      option.key === 'paid' ? 'checkmark-circle-outline' :
+                      option.key === 'delete' ? 'trash-outline' : 'ellipse-outline'
+                    }
+                    size={20}
+                    color={
+                      option.disabled ? '#999' :
+                      option.destructive ? '#e53935' : '#3D5AFE'
+                    }
+                    style={styles.actionButtonIcon}
+                  />
+                  <Text style={[
+                    styles.actionButtonText,
+                    option.disabled && styles.actionButtonTextDisabled,
+                    option.destructive && styles.actionButtonTextDestructive
+                  ]}>
+                    {option.label}
+                  </Text>
+                </Pressable>
+              ))
+            )}
+          </View>
+        </Animated.View>
+      )}
+    </Pressable>
+  );
+});
+
 interface MenuOption {
   key: string;
   label: string;
@@ -891,6 +1082,14 @@ export default function OrdersScreen() {
   const [openDeliveryDropdown, setOpenDeliveryDropdown] = useState(false);
   const [selectedDeliveryPartner, setSelectedDeliveryPartner] = useState<string | null>(null);
   const [pendingStatusChange, setPendingStatusChange] = useState<{orderId: string, newStatus: string, prevStatus: string} | null>(null);
+
+  // Dispatch Confirmation State
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
+  const [dispatchData, setDispatchData] = useState<any>(null);
+  const [dispatchLoading, setDispatchLoading] = useState(false);
+  const [invoiceCreated, setInvoiceCreated] = useState(false);
+  const [selectedDispatchItems, setSelectedDispatchItems] = useState<boolean[]>([]);
+  const [dispatchUpdating, setDispatchUpdating] = useState(false);
 
   // Payment State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -971,6 +1170,13 @@ export default function OrdersScreen() {
     fetchAndSetOrders();
     fetchStaffList(); // Fetch staff list on component mount
   }, []);
+
+  // Handle dispatch modal opening
+  useEffect(() => {
+    if (showDispatchModal && pendingStatusChange) {
+      handleDispatchModalOpen();
+    }
+  }, [showDispatchModal, pendingStatusChange]);
 
   // Refresh data when screen comes into focus
   useFocusEffect(
@@ -1086,7 +1292,7 @@ export default function OrdersScreen() {
     };
   }, [socket]);
 
-  const handleMenu = (order: any) => {
+  const handleMenu = useCallback((order: any) => {
     if (expandedOrderId === order._id) {
       setExpandedOrderId(null);
       setShowStatusOptions(null);
@@ -1095,7 +1301,7 @@ export default function OrdersScreen() {
       setMenuOrder(order);
       setShowStatusOptions(null);
     }
-  };
+  }, [expandedOrderId]);
   const closeMenu = () => {
     setExpandedOrderId(null);
     setMenuOrder(null);
@@ -1170,14 +1376,14 @@ export default function OrdersScreen() {
     setShowStatusOptions(menuOrder._id);
   };
 
-  const handleSelectStatus = async (status: string) => {
+  const handleSelectStatus = useCallback(async (status: string) => {
     setShowStatusOptions(null);
     if (!menuOrder) return;
     if (status === 'Dispatched') {
-      // Open delivery partner modal
+      // Open dispatch confirmation modal
       setPendingStatusChange({ orderId: menuOrder.orderId, newStatus: status, prevStatus: menuOrder.orderStatus });
       setSelectedDeliveryPartner(null);
-      setShowDeliveryModal(true);
+      setShowDispatchModal(true);
       return;
     }
     try {
@@ -1189,7 +1395,7 @@ export default function OrdersScreen() {
       const errorMessage = err.response?.data?.message || "Failed to update status";
       showToast(errorMessage, 'error');
     }
-  };
+  }, [menuOrder, showToast]);
 
   const handleDeleteOrder = () => {
     closeMenu();
@@ -1216,6 +1422,75 @@ export default function OrdersScreen() {
         }
       ]
     );
+  };
+
+  // Dispatch Confirmation Modal Handlers
+  const handleDispatchModalOpen = async () => {
+    if (!pendingStatusChange) return;
+    
+    setDispatchLoading(true);
+    try {
+      const response = await getDispatchConfirmation(pendingStatusChange.orderId);
+      setDispatchData(response.data);
+      setSelectedDispatchItems(new Array(response.data.orderItems.length).fill(true));
+      setInvoiceCreated(false);
+    } catch (err: any) {
+      console.error('Failed to load dispatch data:', err.response?.data || err.message);
+      showToast('Failed to load dispatch data', 'error');
+      setShowDispatchModal(false);
+    } finally {
+      setDispatchLoading(false);
+    }
+  };
+
+  const handleDispatchItemToggle = (index: number) => {
+    const newSelectedItems = [...selectedDispatchItems];
+    newSelectedItems[index] = !newSelectedItems[index];
+    setSelectedDispatchItems(newSelectedItems);
+  };
+
+  const handleDispatchConfirm = async () => {
+    if (!pendingStatusChange || !selectedDeliveryPartner) {
+      Alert.alert("Error", "Please select a delivery partner");
+      return;
+    }
+
+    if (!invoiceCreated) {
+      Alert.alert("Error", "Please confirm that the invoice has been created");
+      return;
+    }
+
+    const hasSelectedItems = selectedDispatchItems.some(selected => selected);
+    if (!hasSelectedItems) {
+      Alert.alert("Error", "Please select at least one item to dispatch");
+      return;
+    }
+
+    setDispatchUpdating(true);
+    try {
+      const selectedIndices = selectedDispatchItems
+        .map((selected, index) => selected ? index : -1)
+        .filter(index => index !== -1);
+
+      await dispatchOrder(pendingStatusChange.orderId, {
+        orderStatus: pendingStatusChange.newStatus,
+        deliveryPartner: selectedDeliveryPartner,
+        dispatchItems: selectedIndices
+      });
+      
+      setShowDispatchModal(false);
+      setPendingStatusChange(null);
+      setSelectedDeliveryPartner(null);
+      setDispatchData(null);
+      fetchAndSetOrders();
+      showToast(`Order dispatched successfully`, 'success');
+    } catch (err: any) {
+      console.error('Dispatch failed:', err.response?.data || err.message);
+      const errorMessage = err.response?.data?.message || "Failed to dispatch order";
+      showToast(errorMessage, 'error');
+    } finally {
+      setDispatchUpdating(false);
+    }
   };
 
   // Delivery Partner Modal Handlers
@@ -1273,8 +1548,8 @@ export default function OrdersScreen() {
     setSelectedRecievedBy(null);
   };
 
-  // Get available menu options based on role
-  const getMenuOptions = (): MenuOption[] => {
+  // Get available menu options based on role - memoized for performance
+  const getMenuOptions = useCallback((): MenuOption[] => {
     const options: MenuOption[] = [
       { key: 'view', label: 'View Details', action: handleViewDetails },
       { key: 'print', label: 'Print To PDF', action: handlePrintPDF },
@@ -1315,7 +1590,7 @@ export default function OrdersScreen() {
     }
 
     return options;
-  };
+  }, [userRole, menuOrder, handleViewDetails, handlePrintPDF, handleEditOrder, handleChangeStatus, handleMarkPaid, handleDeleteOrder]);
 
   return (
     <View style={styles.screenWrap}>
@@ -1386,168 +1661,32 @@ export default function OrdersScreen() {
           keyExtractor={item => item._id}
           contentContainerStyle={{ paddingBottom: 32 }}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.cardPressed
-              ]}
+            <OrderCard
+              item={item}
+              expandedOrderId={expandedOrderId}
+              showStatusOptions={showStatusOptions}
+              animatedHeight={animatedHeight}
+              userRole={userRole}
               onPress={() => router.push({ pathname: '/orders/orderdetails', params: { id: item.orderId, role } })}
-            >
-              {/* Line 1: Order ID and Three Dots */}
-              <View style={styles.cardRowTop}>
-                <Text style={styles.orderId}>{item.orderId}</Text>
-                <Pressable 
-                  style={[styles.menuIconBtn, expandedOrderId === item._id && styles.menuIconBtnActive]} 
-                  onPress={() => handleMenu(item)}
-                >
-                  <Ionicons 
-                    name={expandedOrderId === item._id ? "chevron-up" : "ellipsis-vertical"} 
-                    size={20} 
-                    color={expandedOrderId === item._id ? "#3D5AFE" : "#b0b3b8"} 
-                  />
-                </Pressable>
-              </View>
-              
-              {/* Line 2: Customer Name and Order Status */}
-              <View style={styles.cardRowMid}>
-                <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
-                <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
-                  <Ionicons
-                    name={
-                      item.orderStatus === 'Pending' ? 'time-outline' :
-                      item.orderStatus === 'Invoice' ? 'document-text-outline' :
-                      item.orderStatus === 'Dispatched' ? 'send-outline' :
-                      item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-                    }
-                    size={14}
-                    color={item.orderStatus === 'Pending' ? '#b8860b' :
-                           item.orderStatus === 'Invoice' ? '#388e3c' :
-                           item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                           item.orderStatus === 'DC' ? '#1976d2' : '#222'}
-                    style={{ marginRight: 4 }}
-                  />
-                  <Text style={styles.statusChipText}>{item.orderStatus}</Text>
-                </View>
-              </View>
-              
-              {/* Line 3: Order Route and Badges */}
-              <View style={styles.cardRowMid}>
-                {item.orderRoute && (
-                  <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
-                )}
-                <View style={styles.chipGroup}>
-                  {item.isPartialOrder && (
-                    <View style={[styles.statusChip, { backgroundColor: '#fff3cd', borderColor: '#fff3cd' }]}>
-                      <Ionicons name="warning" size={14} color="#b8860b" style={{ marginRight: 4 }} />
-                      <Text style={[styles.statusChipText, { color: '#b8860b' }]}>Partially</Text>
-                    </View>
-                  )}
-                  {item.urgent && (
-                    <View style={[styles.statusChip, styles.urgentChip]}>
-                      <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-                      <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              
-              {/* Line 4: Total Amount and Payment Due Badge */}
-              <View style={styles.cardRowMid}>
-                <Text style={styles.orderCardTotal}>
-                  Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
-                </Text>
-                {item.paymentMarkedBy && item.paymentRecievedBy ? (
-                  <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
-                    <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusChipText, { color: '#43a047' }]}>Paid</Text>
-                  </View>
-                ) : item.paymentCondition === 'Immediate' ? (
-                  <View style={[styles.statusChip, styles.paymentChip]}>
-                    <Ionicons name="card" size={14} color="#ff5252" style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
-                  </View>
-                ) : null}
-              </View>
-              
-              {/* Line 5: Created At Date */}
-              <View style={styles.cardRowBot}>
-                <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
-              </View>
-              
-              {/* Inline Action Menu */}
-              {expandedOrderId === item._id && (
-                <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
-                  <View style={styles.actionGrid}>
-                    {showStatusOptions === item._id ? (
-                      // Show only valid next status options
-                      getValidNextStatuses(item.orderStatus).map((status) => (
-                        <Pressable
-                          key={status}
-                          style={[styles.actionButton, styles.statusButton]}
-                          onPress={() => handleSelectStatus(status)}
-                        >
-                          <Ionicons
-                            name={
-                              status === 'Pending' ? 'time-outline' :
-                              status === 'DC' ? 'cube-outline' :
-                              status === 'Invoice' ? 'document-text-outline' :
-                              status === 'Dispatched' ? 'send-outline' : 'ellipse-outline'
-                            }
-                            size={20}
-                            color="#3D5AFE"
-                            style={styles.actionButtonIcon}
-                          />
-                          <Text style={[styles.actionButtonText, styles.statusButtonText]}>
-                            {status}
-                          </Text>
-                        </Pressable>
-                      ))
-                    ) : (
-                      // Show regular menu options
-                      getMenuOptions().map((option) => (
-                        <Pressable
-                          key={option.key}
-                          style={[
-                            styles.actionButton,
-                            option.disabled && styles.actionButtonDisabled,
-                            option.destructive && styles.actionButtonDestructive
-                          ]}
-                          onPress={option.disabled ? undefined : option.action}
-                          disabled={option.disabled}
-                        >
-                          <Ionicons
-                            name={
-                              option.key === 'view' ? 'eye-outline' :
-                              option.key === 'print' ? 'print-outline' :
-                              option.key === 'edit' ? 'create-outline' :
-                              option.key === 'status' ? 'swap-horizontal' :
-                              option.key === 'paid' ? 'checkmark-circle-outline' :
-                              option.key === 'delete' ? 'trash-outline' : 'ellipse-outline'
-                            }
-                            size={20}
-                            color={
-                              option.disabled ? '#999' :
-                              option.destructive ? '#e53935' : '#3D5AFE'
-                            }
-                            style={styles.actionButtonIcon}
-                          />
-                          <Text style={[
-                            styles.actionButtonText,
-                            option.disabled && styles.actionButtonTextDisabled,
-                            option.destructive && styles.actionButtonTextDestructive
-                          ]}>
-                            {option.label}
-                          </Text>
-                        </Pressable>
-                      ))
-                    )}
-                  </View>
-                </Animated.View>
-              )}
-            </Pressable>
+              onMenuPress={() => handleMenu(item)}
+              onSelectStatus={handleSelectStatus}
+              getMenuOptions={getMenuOptions}
+              getValidNextStatuses={getValidNextStatuses}
+            />
           )}
           refreshing={refreshing}
           onRefresh={fetchAndSetOrders}
+          // Performance optimizations
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          updateCellsBatchingPeriod={50}
+          initialNumToRender={10}
+          windowSize={10}
+          getItemLayout={(data, index) => ({
+            length: 200, // Approximate height of each item
+            offset: 200 * index,
+            index,
+          })}
           ListEmptyComponent={() => (
             statusFilter === null ? (
               <View style={styles.emptyWrap}>
@@ -1616,6 +1755,152 @@ export default function OrdersScreen() {
             </Pressable>
           </View>
         </Modal>
+
+        {/* Dispatch Confirmation Modal */}
+        <RNModal
+          isVisible={showDispatchModal}
+          onBackdropPress={() => setShowDispatchModal(false)}
+          onBackButtonPress={() => setShowDispatchModal(false)}
+          style={dispatchModalStyles.modal}
+          backdropOpacity={0.5}
+          animationIn="slideInUp"
+          animationOut="slideOutDown"
+          avoidKeyboard={true}
+        >
+          <View style={dispatchModalStyles.modalContainer}>
+            {/* Header */}
+            <View style={dispatchModalStyles.modalHeader}>
+              <Text style={dispatchModalStyles.modalTitle}>Dispatch Confirmation</Text>
+            </View>
+            
+            {/* Content */}
+            <View style={dispatchModalStyles.modalContent}>
+              {dispatchLoading ? (
+                <View style={dispatchModalStyles.loadingContainer}>
+                  <ActivityIndicator size="large" color={ACCENT} />
+                  <Text style={dispatchModalStyles.loadingText}>Loading dispatch data...</Text>
+                </View>
+              ) : dispatchData ? (
+                <ScrollView 
+                  style={dispatchModalStyles.scrollView}
+                  showsVerticalScrollIndicator={false}
+                  bounces={false}
+                >
+                  {/* Invoice Created Checkbox */}
+                  <View style={[dispatchModalStyles.section, { marginTop: 16 }]}>
+                    <Pressable 
+                      style={dispatchModalStyles.checkboxRow}
+                      onPress={() => setInvoiceCreated(!invoiceCreated)}
+                    >
+                      <View style={[
+                        dispatchModalStyles.checkbox,
+                        invoiceCreated && dispatchModalStyles.checkboxSelected
+                      ]}>
+                        {invoiceCreated && <Ionicons name="checkmark" size={16} color="#fff" />}
+                      </View>
+                      <Text style={dispatchModalStyles.checkboxLabel}>Invoice has been created</Text>
+                    </Pressable>
+                  </View>
+
+                  {/* Delivery Partner Selection */}
+                  <View style={dispatchModalStyles.section}>
+                    <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
+                    <View style={{ zIndex: 1000 }}>
+                      <DropDownPicker
+                        loading={staffLoading}
+                        items={staffDropdownItems}
+                        open={openDeliveryDropdown}
+                        value={selectedDeliveryPartner}
+                        setOpen={setOpenDeliveryDropdown}
+                        setValue={setSelectedDeliveryPartner}
+                        placeholder="Select Delivery Partner"
+                        style={styles.dropdownButton}
+                        textStyle={styles.dropdownButtonText}
+                        dropDownContainerStyle={styles.dropdownList}
+                        listItemLabelStyle={styles.dropdownItemLabel}
+                        selectedItemLabelStyle={styles.dropdownSelectedLabel}
+                        placeholderStyle={styles.dropdownPlaceholder}
+                        searchable={false}
+                        listMode="SCROLLVIEW"
+                        scrollViewProps={{ nestedScrollEnabled: true }}
+                      />
+                    </View>
+                  </View>
+
+                  {/* Items Selection */}
+                  <View style={dispatchModalStyles.section}>
+                    <Text style={dispatchModalStyles.sectionTitle}>Items to Dispatch</Text>
+                    {dispatchData.orderItems.map((item: any, index: number) => (
+                      <View key={index} style={[
+                        dispatchModalStyles.dispatchItemCard,
+                        !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemCardUnselected
+                      ]}>
+                        <Pressable 
+                          style={dispatchModalStyles.itemRow}
+                          onPress={() => handleDispatchItemToggle(index)}
+                        >
+                          <View style={[
+                            dispatchModalStyles.checkbox,
+                            selectedDispatchItems[index] && dispatchModalStyles.checkboxSelected
+                          ]}>
+                            {selectedDispatchItems[index] && <Ionicons name="checkmark" size={16} color="#fff" />}
+                          </View>
+                          <View style={dispatchModalStyles.itemDetails}>
+                            <Text style={[
+                              dispatchModalStyles.dispatchItemName,
+                              !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemNameUnselected
+                            ]} numberOfLines={2}>
+                              {item.name}
+                            </Text>
+                            <Text style={[
+                              dispatchModalStyles.dispatchItemMeta,
+                              !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemMetaUnselected
+                            ]}>
+                              Qty: {item.qty} | Stock: {item.availableStock} | Price: ₹{item.price}
+                            </Text>
+                            {!item.canFulfill && (
+                              <Text style={dispatchModalStyles.stockWarning}>⚠️ Insufficient stock</Text>
+                            )}
+                          </View>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              ) : null}
+            </View>
+
+            {/* Action Buttons - Sticky at Bottom */}
+            <View style={dispatchModalStyles.modalFooter}>
+              <Pressable
+                style={[dispatchModalStyles.actionButton, dispatchModalStyles.cancelButton]}
+                onPress={() => setShowDispatchModal(false)}
+              >
+                <Text style={dispatchModalStyles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  dispatchModalStyles.actionButton,
+                  dispatchModalStyles.dispatchButton,
+                  { 
+                    backgroundColor: (invoiceCreated && selectedDeliveryPartner && selectedDispatchItems.some(s => s)) ? ACCENT : '#eee' 
+                  }
+                ]}
+                onPress={handleDispatchConfirm}
+                disabled={!invoiceCreated || !selectedDeliveryPartner || !selectedDispatchItems.some(s => s) || dispatchUpdating}
+              >
+                <Text style={[
+                  dispatchModalStyles.dispatchButtonText,
+                  { 
+                    color: (invoiceCreated && selectedDeliveryPartner && selectedDispatchItems.some(s => s)) ? '#fff' : '#b0b3b8'
+                  }
+                ]}>
+                  {dispatchUpdating ? 'Dispatching...' : 'Dispatch Order'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </RNModal>
 
         {/* Mark as Paid Modal */}
         <Modal
@@ -1768,3 +2053,171 @@ export default function OrdersScreen() {
     </View>
   );
 } 
+
+const dispatchModalStyles = StyleSheet.create({
+  // Modal container styles
+  modal: {
+    margin: 0,
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '70%',
+    minHeight: '70%',
+    flexDirection: 'column',
+  },
+  modalHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    textAlign: 'center',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    gap: 12,
+  },
+  
+  // Loading styles
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  
+  // Scroll view styles
+  scrollView: {
+    flex: 1,
+  },
+  
+  // Section styles
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  
+  // Checkbox styles
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: ACCENT,
+    borderColor: ACCENT,
+  },
+  checkboxLabel: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  
+  // Item styles
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  itemDetails: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  dispatchItemCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dispatchItemCardUnselected: {
+    opacity: 0.6,
+    backgroundColor: '#f8f9fa',
+  },
+  dispatchItemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  dispatchItemNameUnselected: {
+    color: '#999',
+    textDecorationLine: 'line-through',
+  },
+  dispatchItemMeta: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 18,
+  },
+  dispatchItemMetaUnselected: {
+    color: '#999',
+  },
+  stockWarning: {
+    fontSize: 12,
+    color: '#ff5252',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  
+  // Action button styles
+  actionButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  dispatchButton: {
+    backgroundColor: ACCENT,
+  },
+  dispatchButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+}); 

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
 import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes } from "../api";
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,112 @@ const getValidNextStatuses = (currentStatus: string): string[] => {
   return validTransitions[currentStatus as keyof typeof validTransitions] || [];
 };
 const paymentOptions = ["Immediate", "15 Days", "30 Days"];
+
+// Memoized Order Item Component for better performance
+const OrderItemCard = memo(({ 
+  item, 
+  index, 
+  onEdit, 
+  onDelete 
+}: {
+  item: any;
+  index: number;
+  onEdit: (item: any) => void;
+  onDelete: (index: number) => void;
+}) => {
+  return (
+    <View style={styles.orderItemCard}>
+      <View style={styles.orderItemHeader}>
+        <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+        <View style={styles.orderItemActions}>
+          <Pressable 
+            style={[styles.itemActionButton, { marginRight: 8 }]}
+            onPress={() => onEdit({ ...item, index })}
+          >
+            <Ionicons name="pencil" size={16} color={ACCENT} />
+          </Pressable>
+          <Pressable 
+            style={styles.itemActionButton}
+            onPress={() => onDelete(index)}
+          >
+            <Ionicons name="trash" size={16} color="#ff5252" />
+          </Pressable>
+        </View>
+      </View>
+      <View style={styles.orderItemDetails}>
+        <Text style={styles.orderItemMeta}>
+          Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text>
+        </Text>
+        <Text style={styles.orderItemMeta}>
+          Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text>
+        </Text>
+        {item.dimension && (
+          <Text style={styles.orderItemMeta}>
+            {item.dimension}
+          </Text>
+        )}
+      </View>
+      <View style={styles.orderItemFooter}>
+        <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
+      </View>
+    </View>
+  );
+});
+
+// Memoized Product Item Component for better performance
+const ProductItem = memo(({ 
+  item, 
+  onSelect 
+}: {
+  item: any;
+  onSelect: (item: any) => void;
+}) => {
+  return (
+    <Pressable
+      style={styles.productItem}
+      onPress={() => onSelect(item)}
+    >
+      <Text style={styles.productName}>{item.name}</Text>
+      {item.dimension && (
+        <Text style={styles.productDimension}>{item.dimension}</Text>
+      )}
+    </Pressable>
+  );
+});
+
+// Memoized Partial Item Component for better performance
+const PartialItemCard = memo(({ 
+  item, 
+  index 
+}: {
+  item: any;
+  index: number;
+}) => {
+  return (
+    <View style={styles.partialItemCard}>
+      <View style={styles.partialItemHeader}>
+        <Text style={styles.partialItemName}>{item.name}</Text>
+        <Text style={styles.partialItemStatus}>Pending</Text>
+      </View>
+      <View style={styles.partialItemDetails}>
+        <Text style={styles.partialItemMeta}>
+          Qty: <Text style={styles.partialItemMetaValue}>{item.qty}</Text>
+        </Text>
+        <Text style={styles.partialItemMeta}>
+          Price: <Text style={styles.partialItemMetaValue}>₹{item.price}</Text>
+        </Text>
+        {item.dimension && (
+          <Text style={styles.partialItemMeta}>
+            {item.dimension}
+          </Text>
+        )}
+      </View>
+      <View style={styles.partialItemFooter}>
+        <Text style={styles.partialItemTotal}>Total: ₹{item.total}</Text>
+      </View>
+    </View>
+  );
+});
 
 export default function EditOrderScreen() {
   const { id, role } = useLocalSearchParams();
@@ -265,7 +371,7 @@ export default function EditOrderScreen() {
     setForm({ ...form, [field]: value });
   };
 
-  const handleSelectProduct = (product: any) => {
+  const handleSelectProduct = useCallback((product: any) => {
     setEditingItem({
       productId: product._id,
       name: product.name,
@@ -277,14 +383,14 @@ export default function EditOrderScreen() {
     setEditPrice(String(product.price || "0"));
     setShowProductModal(false);
     setShowEditModal(true);
-  };
+  }, []);
 
-  const handleEditItem = (item: any) => {
+  const handleEditItem = useCallback((item: any) => {
     setEditingItem(item);
     setEditQty(String(item.qty));
     setEditPrice(String(item.price));
     setShowEditModal(true);
-  };
+  }, []);
 
   const handleSaveItem = () => {
     const qty = parseInt(editQty) || 0;
@@ -323,7 +429,7 @@ export default function EditOrderScreen() {
     setEditPrice("");
   };
 
-  const handleDeleteItem = (index: number) => {
+  const handleDeleteItem = useCallback((index: number) => {
     Alert.alert(
       "Delete Item",
       "Are you sure you want to remove this item?",
@@ -339,7 +445,7 @@ export default function EditOrderScreen() {
         }
       ]
     );
-  };
+  }, [orderItems]);
 
   // Handle partial order completion
   const handleCompletePartialOrder = async () => {
@@ -441,6 +547,11 @@ export default function EditOrderScreen() {
       setUpdating(false);
     }
   };
+
+  // Memoized order total calculation
+  const orderTotal = useMemo(() => {
+    return Math.round(orderItems.reduce((sum, item) => sum + item.total, 0));
+  }, [orderItems]);
 
   if (loading) return <Text style={{ margin: 32 }}>Loading...</Text>;
 
@@ -796,46 +907,18 @@ export default function EditOrderScreen() {
             ) : (
               <View style={styles.orderItemsList}>
                 {orderItems.map((item, index) => (
-                  <View key={index} style={styles.orderItemCard}>
-                    <View style={styles.orderItemHeader}>
-                      <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
-                      <View style={styles.orderItemActions}>
-                        <Pressable 
-                          style={[styles.itemActionButton, { marginRight: 8 }]}
-                          onPress={() => handleEditItem({ ...item, index })}
-                        >
-                          <Ionicons name="pencil" size={16} color={ACCENT} />
-                        </Pressable>
-                        <Pressable 
-                          style={styles.itemActionButton}
-                          onPress={() => handleDeleteItem(index)}
-                        >
-                          <Ionicons name="trash" size={16} color="#ff5252" />
-                        </Pressable>
-                      </View>
-                    </View>
-                    <View style={styles.orderItemDetails}>
-                      <Text style={styles.orderItemMeta}>
-                        Qty: <Text style={styles.orderItemMetaValue}>{item.qty}</Text>
-                      </Text>
-                      <Text style={styles.orderItemMeta}>
-                        Price: <Text style={styles.orderItemMetaValue}>₹{item.price}</Text>
-                      </Text>
-                      {item.dimension && (
-                        <Text style={styles.orderItemMeta}>
-                          {item.dimension}
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.orderItemFooter}>
-                      <Text style={styles.orderItemTotal}>Total: ₹{item.total}</Text>
-                    </View>
-                  </View>
+                  <OrderItemCard
+                    key={`${item.productId || item.name}-${index}`}
+                    item={item}
+                    index={index}
+                    onEdit={handleEditItem}
+                    onDelete={handleDeleteItem}
+                  />
                 ))}
                 <View style={styles.orderTotalCard}>
                   <Text style={styles.orderTotalLabel}>Order Total</Text>
                   <Text style={styles.orderTotalValue}>
-                    ₹{Math.round(orderItems.reduce((sum, item) => sum + item.total, 0))}
+                    ₹{orderTotal}
                   </Text>
                 </View>
               </View>
@@ -886,28 +969,11 @@ export default function EditOrderScreen() {
 
                 <View style={styles.partialItemsList}>
                   {partialItems.map((item, index) => (
-                    <View key={index} style={styles.partialItemCard}>
-                      <View style={styles.partialItemHeader}>
-                        <Text style={styles.partialItemName}>{item.name}</Text>
-                        <Text style={styles.partialItemStatus}>Pending</Text>
-                      </View>
-                      <View style={styles.partialItemDetails}>
-                        <Text style={styles.partialItemMeta}>
-                          Qty: <Text style={styles.partialItemMetaValue}>{item.qty}</Text>
-                        </Text>
-                        <Text style={styles.partialItemMeta}>
-                          Price: <Text style={styles.partialItemMetaValue}>₹{item.price}</Text>
-                        </Text>
-                        {item.dimension && (
-                          <Text style={styles.partialItemMeta}>
-                            {item.dimension}
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.partialItemFooter}>
-                        <Text style={styles.partialItemTotal}>Total: ₹{item.total}</Text>
-                      </View>
-                    </View>
+                    <PartialItemCard
+                      key={`partial-${item.productId || item.name}-${index}`}
+                      item={item}
+                      index={index}
+                    />
                   ))}
                 </View>
 
@@ -956,19 +1022,25 @@ export default function EditOrderScreen() {
                     keyExtractor={item => item._id}
                     style={styles.productList}
                     renderItem={({ item }) => (
-                      <Pressable
-                        style={styles.productItem}
-                        onPress={() => handleSelectProduct(item)}
-                      >
-                        <Text style={styles.productName}>{item.name}</Text>
-                        {item.dimension && (
-                          <Text style={styles.productDimension}>{item.dimension}</Text>
-                        )}
-                      </Pressable>
+                      <ProductItem
+                        item={item}
+                        onSelect={handleSelectProduct}
+                      />
                     )}
                     ListEmptyComponent={() => (
                       <Text style={styles.emptyListText}>No products found</Text>
                     )}
+                    // Performance optimizations
+                    removeClippedSubviews={true}
+                    maxToRenderPerBatch={10}
+                    updateCellsBatchingPeriod={50}
+                    initialNumToRender={10}
+                    windowSize={10}
+                    getItemLayout={(data, index) => ({
+                      length: 60, // Approximate height of each product item
+                      offset: 60 * index,
+                      index,
+                    })}
                   />
                 )}
               </View>

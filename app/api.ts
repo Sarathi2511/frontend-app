@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-// const BASE_URL = 'http://192.168.0.107:5000/api';
+// const BASE_URL = 'http://192.168.29.111:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
 
 const api = axios.create({
@@ -191,6 +191,13 @@ export const getCustomerNames = () => api.get('/orders/customers');
 export const getOrderRoutes = () => api.get('/orders/routes'); 
 export const getCustomers = () => api.get('/customers');
 export const getCustomerByName = (name: string) => api.get(`/customers/by-name/${encodeURIComponent(name)}`);
+
+// Dispatch confirmation API functions
+export const getDispatchConfirmation = (orderId: string) => 
+  api.get(`/orders/dispatch-confirmation/${orderId}`);
+
+export const dispatchOrder = (orderId: string, data: any) => 
+  api.put(`/orders/by-order-id/${orderId}`, data);
 
 // Partial fulfillment API functions
 export const createOrderWithPartialFulfillment = (data: any) => 
