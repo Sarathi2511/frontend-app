@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
-import RNModal from 'react-native-modal';
+// Removed react-native-modal import - using built-in Modal instead
 import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
@@ -1389,7 +1389,6 @@ export default function OrdersScreen() {
     try {
       await updateOrder(menuOrder.orderId, { orderStatus: status });
       fetchAndSetOrders();
-      showToast(`Status updated to ${status}`, 'success');
     } catch (err: any) {
       console.error('Status update failed:', err.response?.data || err.message);
       const errorMessage = err.response?.data?.message || "Failed to update status";
@@ -1412,7 +1411,6 @@ export default function OrdersScreen() {
             try {
               await deleteOrder(menuOrder.orderId);
               fetchAndSetOrders();
-              showToast('Order deleted successfully', 'success');
             } catch (err: any) {
               console.error('Delete failed:', err.response?.data || err.message);
               const errorMessage = err.response?.data?.message || "Failed to delete order";
@@ -1483,7 +1481,6 @@ export default function OrdersScreen() {
       setSelectedDeliveryPartner(null);
       setDispatchData(null);
       fetchAndSetOrders();
-      showToast(`Order dispatched successfully`, 'success');
     } catch (err: any) {
       console.error('Dispatch failed:', err.response?.data || err.message);
       const errorMessage = err.response?.data?.message || "Failed to dispatch order";
@@ -1503,7 +1500,6 @@ export default function OrdersScreen() {
         deliveryPartner: selectedDeliveryPartner
       });
       fetchAndSetOrders();
-      showToast(`Status updated to ${pendingStatusChange.newStatus}`, 'success');
     } catch (err: any) {
       console.error('Delivery partner update failed:', err.response?.data || err.message);
       const errorMessage = err.response?.data?.message || "Failed to update status";
@@ -1537,7 +1533,6 @@ export default function OrdersScreen() {
         paymentRecievedBy: selectedRecievedBy
       });
       fetchAndSetOrders();
-      showToast('Order marked as paid', 'success');
     } catch (err: any) {
       console.error('Payment update failed:', err.response?.data || err.message);
       const errorMessage = err.response?.data?.message || "Failed to mark as paid";
@@ -1757,17 +1752,20 @@ export default function OrdersScreen() {
         </Modal>
 
         {/* Dispatch Confirmation Modal */}
-        <RNModal
-          isVisible={showDispatchModal}
-          onBackdropPress={() => setShowDispatchModal(false)}
-          onBackButtonPress={() => setShowDispatchModal(false)}
-          style={dispatchModalStyles.modal}
-          backdropOpacity={0.5}
-          animationIn="slideInUp"
-          animationOut="slideOutDown"
-          avoidKeyboard={true}
+        <Modal
+          visible={showDispatchModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowDispatchModal(false)}
         >
-          <View style={dispatchModalStyles.modalContainer}>
+          <Pressable 
+            style={dispatchModalStyles.modalBackdrop}
+            onPress={() => setShowDispatchModal(false)}
+          >
+            <Pressable 
+              style={dispatchModalStyles.modalContainer}
+              onPress={(e) => e.stopPropagation()}
+            >
             {/* Header */}
             <View style={dispatchModalStyles.modalHeader}>
               <Text style={dispatchModalStyles.modalTitle}>Dispatch Confirmation</Text>
@@ -1803,28 +1801,67 @@ export default function OrdersScreen() {
                   </View>
 
                   {/* Delivery Partner Selection */}
-                  <View style={dispatchModalStyles.section}>
+                  <View style={[dispatchModalStyles.section, { position: 'relative' }]}>
                     <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
-                    <View style={{ zIndex: 1000 }}>
-                      <DropDownPicker
-                        loading={staffLoading}
-                        items={staffDropdownItems}
-                        open={openDeliveryDropdown}
-                        value={selectedDeliveryPartner}
-                        setOpen={setOpenDeliveryDropdown}
-                        setValue={setSelectedDeliveryPartner}
-                        placeholder="Select Delivery Partner"
-                        style={styles.dropdownButton}
-                        textStyle={styles.dropdownButtonText}
-                        dropDownContainerStyle={styles.dropdownList}
-                        listItemLabelStyle={styles.dropdownItemLabel}
-                        selectedItemLabelStyle={styles.dropdownSelectedLabel}
-                        placeholderStyle={styles.dropdownPlaceholder}
-                        searchable={false}
-                        listMode="SCROLLVIEW"
-                        scrollViewProps={{ nestedScrollEnabled: true }}
+                    <Pressable 
+                      style={dispatchModalStyles.deliveryPartnerPicker} 
+                      onPress={() => setOpenDeliveryDropdown(!openDeliveryDropdown)}
+                    >
+                      <Text style={styles.inputIcon}>🚚</Text>
+                      <Text style={[
+                        dispatchModalStyles.deliveryPartnerPickerText,
+                        !selectedDeliveryPartner && dispatchModalStyles.deliveryPartnerPickerPlaceholder
+                      ]}>
+                        {selectedDeliveryPartner ? 
+                          staffDropdownItems.find(item => item.value === selectedDeliveryPartner)?.label || 'Select Delivery Partner' :
+                          'Select Delivery Partner'
+                        }
+                      </Text>
+                      <Ionicons 
+                        name={openDeliveryDropdown ? "chevron-up" : "chevron-down"} 
+                        size={18} 
+                        color={ACCENT} 
                       />
-                    </View>
+                    </Pressable>
+                    
+                    {openDeliveryDropdown && (
+                      <>
+                        <Pressable 
+                          style={dispatchModalStyles.dropdownOverlay} 
+                          onPress={() => setOpenDeliveryDropdown(false)}
+                        />
+                        <View style={dispatchModalStyles.deliveryPartnerDropdown}>
+                          <ScrollView 
+                            style={dispatchModalStyles.dropdownScrollView}
+                            showsVerticalScrollIndicator={false}
+                            nestedScrollEnabled={true}
+                          >
+                            {staffDropdownItems.map((item) => (
+                              <Pressable
+                                key={item.value}
+                                style={({ pressed }) => [
+                                  dispatchModalStyles.deliveryPartnerOption,
+                                  selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionSelected,
+                                  pressed && { opacity: 0.7 }
+                                ]}
+                                onPress={() => { 
+                                  setSelectedDeliveryPartner(item.value); 
+                                  setOpenDeliveryDropdown(false); 
+                                }}
+                              >
+                                <Text style={styles.inputIcon}>👤</Text>
+                                <Text style={[
+                                  dispatchModalStyles.deliveryPartnerOptionText,
+                                  selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionTextSelected
+                                ]}>
+                                  {item.label}
+                                </Text>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      </>
+                    )}
                   </View>
 
                   {/* Items Selection */}
@@ -1899,8 +1936,9 @@ export default function OrdersScreen() {
                 </Text>
               </Pressable>
             </View>
-          </View>
-        </RNModal>
+            </Pressable>
+          </Pressable>
+        </Modal>
 
         {/* Mark as Paid Modal */}
         <Modal
@@ -2060,13 +2098,26 @@ const dispatchModalStyles = StyleSheet.create({
     margin: 0,
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalContainer: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '70%',
-    minHeight: '70%',
+    borderRadius: 20,
+    height: '90%',
+    width: '100%',
     flexDirection: 'column',
+    marginTop: Platform.OS === 'ios' ? 44 : 24, // Safe area top
+    marginBottom: Platform.OS === 'ios' ? 34 : 24, // Safe area bottom
+    marginHorizontal: 16, // Small side margins
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     paddingHorizontal: 20,
@@ -2094,6 +2145,83 @@ const dispatchModalStyles = StyleSheet.create({
     gap: 12,
   },
   
+  // Delivery Partner Dropdown styles
+  deliveryPartnerPicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f6fa',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    marginTop: 8,
+  },
+  deliveryPartnerPickerText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  deliveryPartnerPickerPlaceholder: {
+    color: '#b0b3b8',
+  },
+  deliveryPartnerDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    zIndex: 1000,
+  },
+  deliveryPartnerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    marginVertical: 2,
+  },
+  deliveryPartnerOptionSelected: {
+    backgroundColor: ACCENT,
+  },
+  deliveryPartnerOptionText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 8,
+  },
+  deliveryPartnerOptionTextSelected: {
+    color: '#fff',
+    fontWeight: '700',
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: -1000,
+    left: -1000,
+    right: -1000,
+    bottom: -1000,
+    backgroundColor: 'transparent',
+    zIndex: 999,
+  },
+  dropdownScrollView: {
+    maxHeight: 200,
+  },
+
   // Loading styles
   loadingContainer: {
     alignItems: 'center',

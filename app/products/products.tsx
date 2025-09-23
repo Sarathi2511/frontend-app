@@ -157,7 +157,6 @@ export default function ProductsScreen() {
 
     try {
       await updateProductStock(stockUpdateModal.product._id, stockToAdd);
-      showToast(`Stock updated successfully! Added ${stockToAdd} units.`, 'success');
       setStockUpdateModal({ visible: false, product: null, stockToAdd: '', loading: false });
       fetchAndSetProducts();
     } catch (err: any) {
@@ -241,7 +240,6 @@ export default function ProductsScreen() {
 
       // Show success message with details
       const successMessage = `Import completed! ${summary.created} created, ${summary.updated} updated${summary.warnings.length > 0 ? `, ${summary.warnings.length} warnings` : ''}${summary.errors.length > 0 ? `, ${summary.errors.length} errors` : ''}`;
-      showToast(successMessage, 'success');
 
     } catch (e: any) {
       setImportProgress(prev => ({

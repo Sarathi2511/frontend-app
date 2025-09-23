@@ -98,7 +98,6 @@ export default function NewProductScreen() {
     };
     try {
       await createProduct(productData);
-      showToast('Product created successfully!', 'success');
       // Navigate after showing toast
       setTimeout(() => {
         if (params.returnTo === 'orderitems') {

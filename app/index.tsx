@@ -17,13 +17,17 @@ export default function Welcome() {
   const iconAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
+    let animationLoop: Animated.CompositeAnimation | null = null;
+    
+    // Start the animation loop
+    animationLoop = Animated.loop(
       Animated.timing(iconAnim, {
         toValue: 1,
         duration: 1800,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    animationLoop.start();
 
     // On landing, clear any invalid tokens but don't auto-navigate
     const bootstrap = async () => {
@@ -44,6 +48,13 @@ export default function Welcome() {
       }
     };
     bootstrap();
+
+    // Cleanup animation on unmount
+    return () => {
+      if (animationLoop) {
+        animationLoop.stop();
+      }
+    };
   }, []);
 
   const spin = iconAnim.interpolate({

@@ -286,7 +286,6 @@ export default function NewOrderScreen() {
         
         // Show success message if details were auto-filled
         if (customer.phone || customer.address) {
-          showToast('Customer details auto-filled successfully!', 'success');
         }
       }
     } catch (err) {
@@ -298,7 +297,6 @@ export default function NewOrderScreen() {
       }));
       
       // Show info message
-      showToast('Customer details not found. Please fill manually.', 'info');
     } finally {
       setCustomerDetailsLoading(false);
     }

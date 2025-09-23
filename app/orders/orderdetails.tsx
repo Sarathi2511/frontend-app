@@ -61,7 +61,6 @@ export default function OrderDetailsScreen() {
     setCancelling(true);
     try {
       await cancelOrder(order.orderId, cancellationReason);
-      showToast('Order cancelled successfully', 'success');
       setShowCancelModal(false);
       setCancellationReason('');
       // Refresh order data

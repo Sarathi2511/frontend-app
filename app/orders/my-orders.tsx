@@ -1,6 +1,6 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert } from "react-native";
+import { useEffect, useState, useCallback, memo } from "react";
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrder } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
@@ -30,6 +30,88 @@ interface MenuOption {
   disabled?: boolean;
 }
 
+// Simple Order Card Component (without three dots menu)
+const OrderCard = memo(({ 
+  item, 
+  onPress 
+}: { 
+  item: any; 
+  onPress: (order: any) => void;
+}) => {
+  const handleCardPress = () => {
+    // Navigate to order details with the order ID
+    onPress(item);
+  };
+
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        pressed && styles.cardPressed
+      ]}
+      onPress={handleCardPress}
+    >
+      {/* Line 1: Order ID */}
+      <View style={styles.cardRowTop}>
+        <Text style={styles.orderId}>{item.orderId}</Text>
+      </View>
+      {/* Line 2: Name and status chips */}
+      <View style={styles.cardRowMid}>
+        <Text style={styles.customerName}>{item.customerName}</Text>
+        {item.orderRoute && (
+          <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
+        )}
+        <View style={styles.chipGroup}>
+          <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+            <Ionicons
+              name={
+                item.orderStatus === 'Pending' ? 'time-outline' :
+                item.orderStatus === 'Invoice' ? 'document-text-outline' :
+                item.orderStatus === 'Dispatched' ? 'send-outline' :
+                item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+              }
+              size={14}
+              color={item.orderStatus === 'Pending' ? '#b8860b' :
+                     item.orderStatus === 'Invoice' ? '#388e3c' :
+                     item.orderStatus === 'Dispatched' ? '#8e24aa' :
+                     item.orderStatus === 'DC' ? '#1976d2' : '#222'}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+          </View>
+          {item.urgent && (
+            <View style={[styles.statusChip, styles.urgentChip]}>
+              <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
+              <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      {/* Line 2.5: Total Price */}
+      <View style={{ marginTop: 4, marginBottom: 2 }}>
+        <Text style={styles.orderCardTotal}>
+          Total: ₹{Array.isArray(item.orderItems) ? item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0) : 0}
+        </Text>
+      </View>
+      {/* Line 3: Created date and payment chip */}
+      <View style={styles.cardRowBot}>
+        <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
+        {item.paymentMarkedBy && item.paymentRecievedBy ? (
+          <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
+            <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
+            <Text style={[styles.statusChipText, { color: '#43a047' }]}>Paid</Text>
+          </View>
+        ) : item.paymentCondition === 'Immediate' ? (
+          <View style={[styles.statusChip, styles.paymentChip]}>
+            <Ionicons name="card" size={14} color="#ff5252" style={{ marginRight: 4 }} />
+            <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+});
+
 export default function MyOrdersScreen() {
   const router = useRouter();
   const { role, name } = useLocalSearchParams();
@@ -38,31 +120,13 @@ export default function MyOrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [menuOrder, setMenuOrder] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [staffList, setStaffList] = useState<any[]>([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusOrder, setStatusOrder] = useState<any>(null);
-  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
-  const [openDeliveryDropdown, setOpenDeliveryDropdown] = useState(false);
-  const [selectedDeliveryPartner, setSelectedDeliveryPartner] = useState<string | null>(null);
-  const [pendingStatusChange, setPendingStatusChange] = useState<{orderId: string, newStatus: string, prevStatus: string} | null>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [openMarkedByDropdown, setOpenMarkedByDropdown] = useState(false);
-  const [openRecievedByDropdown, setOpenRecievedByDropdown] = useState(false);
-  const [selectedMarkedBy, setSelectedMarkedBy] = useState<string | null>(null);
-  const [selectedRecievedBy, setSelectedRecievedBy] = useState<string | null>(null);
-  const [paymentOrder, setPaymentOrder] = useState<any>(null);
   // Remove statusFilter state and logic
 
-  // Convert staff list to dropdown format
-  const staffDropdownItems = staffList.map(staff => ({
-    label: `${staff.name} (${staff.role})`,
-    value: staff.name
-  }));
 
   // Fetch orders assigned to this user
   const fetchAndSetOrders = async () => {
@@ -192,150 +256,12 @@ export default function MyOrdersScreen() {
     };
   }, [socket]);
 
-  // Menu actions (replicated from orders.tsx)
-  const handleMenu = (order: any) => setMenuOrder(order);
-  const closeMenu = () => setMenuOrder(null);
-  const handleViewDetails = () => {
-    closeMenu();
-    router.push({ pathname: '/orders/orderdetails', params: { id: menuOrder.orderId, role } });
-  };
-  const handlePrintPDF = () => { closeMenu(); alert('Print to PDF (mock)'); };
-  const handleEditOrder = () => {
-    closeMenu();
-    router.push({ pathname: '/orders/EditOrder', params: { id: menuOrder.orderId, role } });
-  };
-  const handleMarkPaid = async () => {
-    closeMenu();
-    if (staffList.length === 0 && !staffLoading && !staffError) {
-      await fetchStaffList();
-    }
-    setSelectedMarkedBy(null);
-    setSelectedRecievedBy(null);
-    setPaymentOrder(menuOrder);
-    setShowPaymentModal(true);
-  };
-  const handleChangeStatus = () => {
-    setStatusOrder(menuOrder);
-    setMenuOrder(null);
-    setTimeout(() => setShowStatusModal(true), 200);
-  };
-  const handleSelectStatus = async (status: string) => {
-    setShowStatusModal(false);
-    if (!statusOrder) return;
-    if (status === 'Dispatched') {
-      setPendingStatusChange({ orderId: statusOrder.orderId, newStatus: status, prevStatus: statusOrder.orderStatus });
-      setSelectedDeliveryPartner(null);
-      setShowDeliveryModal(true);
-      setStatusOrder(null);
-      return;
-    }
-    setStatusOrder(null);
-    try {
-      await updateOrder(statusOrder.orderId, { orderStatus: status });
-      fetchAndSetOrders();
-    } catch (err: any) {
-      Alert.alert("Error", err.response?.data?.message || "Failed to update status");
-    }
-  };
-  const handleDeleteOrder = () => {
-    closeMenu();
-    if (!menuOrder || userRole !== 'Admin') return;
-    Alert.alert(
-      "Delete Order",
-      "Are you sure you want to delete this order?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteOrder(menuOrder.orderId);
-              fetchAndSetOrders();
-            } catch (err: any) {
-              Alert.alert("Error", "Failed to delete order");
-            }
-          }
-        }
-      ]
-    );
-  };
-  const handleDeliveryPartnerSelect = async () => {
-    if (!pendingStatusChange || !selectedDeliveryPartner) return;
-    setShowDeliveryModal(false);
-    try {
-      await updateOrder(pendingStatusChange.orderId, {
-        orderStatus: pendingStatusChange.newStatus,
-        deliveryPartner: selectedDeliveryPartner
-      });
-      fetchAndSetOrders();
-    } catch (err: any) {
-      Alert.alert("Error", err.response?.data?.message || "Failed to update status");
-    }
-    setPendingStatusChange(null);
-    setSelectedDeliveryPartner(null);
-  };
-  const handleDeliveryModalClose = () => {
-    if (!selectedDeliveryPartner) {
-      alert('Please Choose Delivery Partner');
-      if (pendingStatusChange) {
-        updateOrder(pendingStatusChange.orderId, pendingStatusChange.prevStatus);
-        setPendingStatusChange(null);
-      }
-      return;
-    }
-    setShowDeliveryModal(false);
-    setPendingStatusChange(null);
-    setSelectedDeliveryPartner(null);
-  };
-  const handlePaymentSubmit = async () => {
-    if (!selectedMarkedBy || !selectedRecievedBy || !paymentOrder) return;
-    setShowPaymentModal(false);
-    try {
-      await updateOrder(paymentOrder.orderId, {
-        paymentMarkedBy: selectedMarkedBy,
-        paymentRecievedBy: selectedRecievedBy
-      });
-      fetchAndSetOrders();
-    } catch (err: any) {
-      Alert.alert("Error", err.response?.data?.message || "Failed to mark as paid");
-    }
-    setPaymentOrder(null);
-    setSelectedMarkedBy(null);
-    setSelectedRecievedBy(null);
-  };
-
-  // Get available menu options based on role
-  const getMenuOptions = (): MenuOption[] => {
-    const options: MenuOption[] = [
-      { key: 'view', label: 'View Details', action: handleViewDetails },
-      { key: 'print', label: 'Print To PDF', action: handlePrintPDF },
-    ];
-    if (["Admin", "Staff"].includes(userRole)) {
-      options.push(
-        { key: 'edit', label: 'Edit Order', action: handleEditOrder },
-        { key: 'status', label: 'Change Status', action: handleChangeStatus },
-        { 
-          key: 'paid', 
-          label: 'Mark as Paid',
-          action: handleMarkPaid,
-          disabled: !(menuOrder && menuOrder.orderStatus === 'Dispatched')
-        }
-      );
-    } else if (userRole === 'Executive') {
-      options.push(
-        { key: 'edit', label: 'Edit Order', action: handleEditOrder }
-      );
-    }
-    if (userRole === 'Admin') {
-      options.push({
-        key: 'delete',
-        label: 'Delete Order',
-        action: handleDeleteOrder,
-        destructive: true
-      });
-    }
-    return options;
+  // Navigate to order details when card is pressed
+  const handleMenu = (order: any) => {
+    router.push({
+      pathname: '/orders/orderdetails',
+      params: { id: order.orderId }
+    });
   };
 
   return (
@@ -367,74 +293,10 @@ export default function MyOrdersScreen() {
           keyExtractor={item => item._id}
           contentContainerStyle={{ paddingBottom: 32 }}
           renderItem={({ item }) => (
-            <Pressable
-              style={({ pressed }) => [
-                styles.card,
-                pressed && styles.cardPressed
-              ]}
-              onPress={() => handleMenu(item)}
-            >
-              {/* Line 1: Order ID and menu icon */}
-              <View style={styles.cardRowTop}>
-                <Text style={styles.orderId}>{item.orderId}</Text>
-                <Pressable style={styles.menuIconBtn} onPress={() => handleMenu(item)}>
-                  <Ionicons name="ellipsis-vertical" size={20} color="#b0b3b8" />
-                </Pressable>
-              </View>
-              {/* Line 2: Name and status chips */}
-              <View style={styles.cardRowMid}>
-                <Text style={styles.customerName}>{item.customerName}</Text>
-                {item.orderRoute && (
-                  <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
-                )}
-                <View style={styles.chipGroup}>
-                  <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
-                    <Ionicons
-                      name={
-                        item.orderStatus === 'Pending' ? 'time-outline' :
-                        item.orderStatus === 'Invoice' ? 'document-text-outline' :
-                        item.orderStatus === 'Dispatched' ? 'send-outline' :
-                        item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-                      }
-                      size={14}
-                      color={item.orderStatus === 'Pending' ? '#b8860b' :
-                             item.orderStatus === 'Invoice' ? '#388e3c' :
-                             item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                             item.orderStatus === 'DC' ? '#1976d2' : '#222'}
-                      style={{ marginRight: 4 }}
-                    />
-                    <Text style={styles.statusChipText}>{item.orderStatus}</Text>
-                  </View>
-                  {item.urgent && (
-                    <View style={[styles.statusChip, styles.urgentChip]}>
-                      <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-                      <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              {/* Line 2.5: Total Price */}
-              <View style={{ marginTop: 4, marginBottom: 2 }}>
-                <Text style={styles.orderCardTotal}>
-                  Total: ₹{Array.isArray(item.orderItems) ? item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0) : 0}
-                </Text>
-              </View>
-              {/* Line 3: Created date and payment chip */}
-              <View style={styles.cardRowBot}>
-                <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
-                {item.paymentMarkedBy && item.paymentRecievedBy ? (
-                  <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
-                    <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusChipText, { color: '#43a047' }]}>Paid</Text>
-                  </View>
-                ) : item.paymentCondition === 'Immediate' ? (
-                  <View style={[styles.statusChip, styles.paymentChip]}>
-                    <Ionicons name="card" size={14} color="#ff5252" style={{ marginRight: 4 }} />
-                    <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
-                  </View>
-                ) : null}
-              </View>
-            </Pressable>
+            <OrderCard
+              item={item}
+              onPress={handleMenu}
+            />
           )}
           refreshing={refreshing}
           onRefresh={fetchAndSetOrders}
@@ -444,128 +306,6 @@ export default function MyOrdersScreen() {
             </View>
           )}
         />
-        {/* Action Menu Modal */}
-        <Modal
-          visible={!!menuOrder}
-          transparent
-          animationType="fade"
-          onRequestClose={closeMenu}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={closeMenu} />
-          <View style={styles.menuSheet}>
-            {getMenuOptions().map(option => (
-              <Pressable
-                key={option.key}
-                style={[styles.menuItem, option.destructive && styles.menuItemDestructive, option.disabled && styles.menuItemDisabled]}
-                onPress={option.disabled ? undefined : option.action}
-                disabled={option.disabled}
-              >
-                <Text style={[styles.menuItemText, option.destructive && styles.menuItemTextDestructive, option.disabled && styles.menuItemTextDisabled]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
-        {/* Status Change Modal */}
-        <Modal
-          visible={showStatusModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowStatusModal(false)}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowStatusModal(false)} />
-          <View style={styles.menuSheet}>
-            {statusOrder && statusOptions.filter(s => s !== statusOrder.orderStatus).map(status => (
-              <Pressable key={status} style={styles.menuItem} onPress={() => handleSelectStatus(status)}>
-                <Text style={styles.menuItemText}>{status}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </Modal>
-        {/* Delivery Partner Modal */}
-        <Modal
-          visible={showDeliveryModal}
-          transparent
-          animationType="fade"
-          onRequestClose={handleDeliveryModalClose}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={handleDeliveryModalClose} />
-          <View style={styles.menuSheet}>
-            <Text style={styles.menuItemText}>Select Delivery Partner for Order {pendingStatusChange?.orderId}</Text>
-            <DropDownPicker
-              open={openDeliveryDropdown}
-              setOpen={setOpenDeliveryDropdown}
-              items={staffDropdownItems}
-              setItems={setStaffList} // This is a bit hacky, ideally setItems should be a function
-              value={selectedDeliveryPartner}
-              setValue={setSelectedDeliveryPartner}
-              placeholder="Select Delivery Partner"
-              style={styles.dropdown}
-            />
-            <Pressable
-              style={[styles.menuItem, styles.menuItemDestructive]}
-              onPress={handleDeliveryPartnerSelect}
-            >
-              <Text style={styles.menuItemText}>Confirm Delivery Partner</Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuItem}
-              onPress={handleDeliveryModalClose}
-            >
-              <Text style={styles.menuItemText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Modal>
-        {/* Payment Modal */}
-        <Modal
-          visible={showPaymentModal}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowPaymentModal(false)}
-        >
-          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setShowPaymentModal(false)} />
-          <View style={styles.menuSheet}>
-            <Text style={styles.menuItemText}>Mark Order {paymentOrder?.orderId} as Paid</Text>
-            <DropDownPicker
-              open={openMarkedByDropdown}
-              setOpen={setOpenMarkedByDropdown}
-              items={staffDropdownItems}
-              setItems={setStaffList} // This is a bit hacky, ideally setItems should be a function
-              value={selectedMarkedBy}
-              setValue={setSelectedMarkedBy}
-              placeholder="Marked By"
-              style={styles.dropdown}
-            />
-            <DropDownPicker
-              open={openRecievedByDropdown}
-              setOpen={setOpenRecievedByDropdown}
-              items={staffDropdownItems}
-              setItems={setStaffList} // This is a bit hacky, ideally setItems should be a function
-              value={selectedRecievedBy}
-              setValue={setSelectedRecievedBy}
-              placeholder="Recieved By"
-              style={styles.dropdown}
-            />
-            <Pressable
-              style={[styles.menuItem, styles.menuItemDestructive]}
-              onPress={handlePaymentSubmit}
-            >
-              <Text style={styles.menuItemText}>Confirm Payment</Text>
-            </Pressable>
-            <Pressable
-              style={styles.menuItem}
-              onPress={() => {
-                setPaymentOrder(null);
-                setSelectedMarkedBy(null);
-                setSelectedRecievedBy(null);
-                setShowPaymentModal(false);
-              }}
-            >
-              <Text style={styles.menuItemText}>Cancel</Text>
-            </Pressable>
-          </View>
-        </Modal>
         </>
       )}
     </SafeAreaView>

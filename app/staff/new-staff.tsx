@@ -73,7 +73,6 @@ export default function NewStaffScreen() {
         password: form.password 
       });
       if (isMounted.current) {
-        showToast('Staff created successfully!', 'success');
         // Navigate after showing toast
         setTimeout(() => {
           router.replace('/staff');

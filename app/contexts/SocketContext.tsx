@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNotifications } from './NotificationContext';
@@ -32,9 +32,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastProductEvent, setLastProductEvent] = useState<any>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { addNotification } = useNotifications();
+  const notificationContext = useNotifications();
   const BASE_URL = 'https://backend-app-1qf1.onrender.com';
   // const BASE_URL = 'http://192.168.29.111:5000';
+  
+  // Memoize addNotification to prevent unnecessary re-renders
+  const addNotification = useCallback((notification: any) => {
+    notificationContext.addNotification(notification);
+  }, [notificationContext]);
 
   const connect = async () => {
     try {
@@ -230,17 +235,27 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    
     // Connect on mount
-    connect();
+    const initializeConnection = async () => {
+      if (isMounted) {
+        await connect();
+      }
+    };
+    
+    initializeConnection();
 
     // Cleanup on unmount
     return () => {
+      isMounted = false;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       disconnect();
     };
-  }, []);
+  }, []); // Empty dependency array is correct here
 
   const value: SocketContextType = {
     socket,

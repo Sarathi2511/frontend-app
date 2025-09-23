@@ -28,43 +28,56 @@ export default function LoginScreen() {
 
   // Check if user is already logged in - but don't auto-navigate
   useEffect(() => {
+    let isMounted = true;
+    
     const checkLoginStatus = async () => {
       // Don't check login status if user is actively logging in
-      if (isLoggingIn) return;
+      if (isLoggingIn || !isMounted) return;
       
       try {
         const token = await AsyncStorage.getItem('token');
         const role = await AsyncStorage.getItem('userRole');
         const name = await AsyncStorage.getItem('userName');
-        if (token && role) {
+        
+        if (token && role && isMounted) {
           // Validate token with backend - but don't navigate
           const { success } = await (await import('./utils/api')).validateToken();
-          if (success) {
+          if (success && isMounted) {
             // Don't auto-navigate - let the user manually log in
             // await connect();
             // router.replace({ pathname: "./dashboard", params: { role, name } });
             return;
           }
         }
+        
         // Token invalid; ensure cleared
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('userRole');
-        await AsyncStorage.removeItem('userId');
-        await AsyncStorage.removeItem('userName');
+        if (isMounted) {
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('userRole');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('userName');
+        }
       } catch (error: any) {
         // Clear invalid tokens and show appropriate message if needed
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('userRole');
-        await AsyncStorage.removeItem('userId');
-        await AsyncStorage.removeItem('userName');
-        
-        // Only show error toast for network issues, not for expired tokens
-        if (error.message && error.message.includes('Network error')) {
-          showToast('Network error. Please check your connection', 'error');
+        if (isMounted) {
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('userRole');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('userName');
+          
+          // Only show error toast for network issues, not for expired tokens
+          if (error.message && error.message.includes('Network error')) {
+            showToast('Network error. Please check your connection', 'error');
+          }
         }
       }
     };
+    
     checkLoginStatus();
+    
+    return () => {
+      isMounted = false;
+    };
   }, [showToast, isLoggingIn]); // Removed connect from dependencies
 
   useEffect(() => {
@@ -117,7 +130,6 @@ export default function LoginScreen() {
                            data.role === 'Staff' ? 'Welcome back, Staff!' :
                            data.role === 'Executive' ? 'Welcome back, Executive!' :
                            `Welcome back, ${data.name}!`;
-        showToast(roleMessage, 'success');
       } else {
         showToast('Login failed. Please try again', 'error');
       }
