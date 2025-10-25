@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
+// Two URLS for development and production
 // const BASE_URL = 'http://192.168.29.111:5000/api';
 const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
 
