@@ -9,7 +9,7 @@ import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
-const roleOptions = ["Admin", "Staff", "Executive"];
+const roleOptions = ["Super Admin", "Admin", "Staff", "Executive"];
 
 export default function EditStaffScreen() {
   const { id } = useLocalSearchParams();
