@@ -110,7 +110,7 @@ export default function ProductsScreen() {
       duration: 150,
       useNativeDriver: false,
     }).start();
-    if (!product || userRole !== 'Admin') return;
+    if (!product || (userRole !== 'Admin' && userRole !== 'Super Admin')) return;
     Alert.alert(
       'Delete Product',
       `Are you sure you want to delete "${product.name}"?`,
@@ -547,7 +547,7 @@ export default function ProductsScreen() {
                       <Text style={[styles.actionButtonText, styles.updateStockButtonText]}>Update Stock</Text>
                     </Pressable>
                     
-                    {userRole === 'Admin' && (
+                    {(userRole === 'Super Admin' || userRole === 'Admin') && (
                       <Pressable 
                         style={[styles.actionButton, styles.deleteButton]} 
                         onPress={() => handleDeleteProduct(item)}

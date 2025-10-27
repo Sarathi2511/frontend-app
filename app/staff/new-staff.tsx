@@ -73,13 +73,16 @@ export default function NewStaffScreen() {
         password: form.password 
       });
       if (isMounted.current) {
+        showToast('Staff created successfully!', 'success');
         // Navigate after showing toast
         setTimeout(() => {
           router.replace('/staff');
         }, 1500);
       }
-    } catch (err) {
-      showToast('Failed to create staff', 'error');
+    } catch (err: any) {
+      console.error('Staff creation error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to create staff';
+      showToast(errorMessage, 'error');
     }
     setCreating(false);
   };

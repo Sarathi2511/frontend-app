@@ -1398,7 +1398,7 @@ export default function OrdersScreen() {
 
   const handleDeleteOrder = () => {
     closeMenu();
-    if (!menuOrder || userRole !== 'Admin') return;
+    if (!menuOrder || (userRole !== 'Admin' && userRole !== 'Super Admin')) return;
     Alert.alert(
       "Delete Order",
       "Are you sure you want to delete this order?",
@@ -1551,7 +1551,7 @@ export default function OrdersScreen() {
     ];
 
     // Add edit/status/payment options based on role
-    if (['Admin', 'Staff'].includes(userRole)) {
+    if (['Super Admin', 'Admin', 'Staff'].includes(userRole)) {
       options.push(
         { key: 'edit', label: 'Edit Order', action: handleEditOrder },
         { 
@@ -1574,8 +1574,8 @@ export default function OrdersScreen() {
       );
     }
 
-    // Add delete option for Admin only
-    if (userRole === 'Admin') {
+    // Add delete option for Super Admin and Admin only
+    if (userRole === 'Super Admin' || userRole === 'Admin') {
       options.push({
         key: 'delete',
         label: 'Delete Order',
