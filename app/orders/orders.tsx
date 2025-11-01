@@ -926,12 +926,6 @@ const OrderCard = memo(({
           <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
         )}
         <View style={styles.chipGroup}>
-          {item.isPartialOrder && (
-            <View style={[styles.statusChip, { backgroundColor: '#fff3cd', borderColor: '#fff3cd' }]}>
-              <Ionicons name="warning" size={14} color="#b8860b" style={{ marginRight: 4 }} />
-              <Text style={[styles.statusChipText, { color: '#b8860b' }]}>Partially</Text>
-            </View>
-          )}
           {item.urgent && (
             <View style={[styles.statusChip, styles.urgentChip]}>
               <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
@@ -1398,7 +1392,7 @@ export default function OrdersScreen() {
 
   const handleDeleteOrder = () => {
     closeMenu();
-    if (!menuOrder || (userRole !== 'Admin' && userRole !== 'Super Admin')) return;
+    if (!menuOrder || userRole !== 'Admin') return;
     Alert.alert(
       "Delete Order",
       "Are you sure you want to delete this order?",
@@ -1551,7 +1545,7 @@ export default function OrdersScreen() {
     ];
 
     // Add edit/status/payment options based on role
-    if (['Super Admin', 'Admin', 'Staff'].includes(userRole)) {
+    if (['Admin', 'Staff'].includes(userRole)) {
       options.push(
         { key: 'edit', label: 'Edit Order', action: handleEditOrder },
         { 
@@ -1574,8 +1568,8 @@ export default function OrdersScreen() {
       );
     }
 
-    // Add delete option for Super Admin and Admin only
-    if (userRole === 'Super Admin' || userRole === 'Admin') {
+    // Add delete option for Admin only
+    if (userRole === 'Admin') {
       options.push({
         key: 'delete',
         label: 'Delete Order',

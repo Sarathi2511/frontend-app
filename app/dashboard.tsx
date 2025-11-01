@@ -19,7 +19,7 @@ const modules = [
     icon: "📦",
     color: "#3D5AFE",
     description: "View and create shop orders.",
-    roles: ["Super Admin", "Admin", "Staff", "Executive"]
+    roles: ["Admin", "Staff", "Executive"]
   },
   {
     key: "inventory",
@@ -27,7 +27,7 @@ const modules = [
     icon: "💡",
     color: "#00C853",
     description: "Check and update stock levels.",
-    roles: ["Super Admin", "Admin"]  // Super Admin and Admin only
+    roles: ["Admin"]  // Admin only
   },
   {
     key: "staff",
@@ -35,7 +35,7 @@ const modules = [
     icon: "👤",
     color: "#FF9100",
     description: "Manage staff information.",
-    roles: ["Super Admin"]  // Super Admin only
+    roles: ["Admin"]  // Admin only
   },
   {
     key: "analytics",
@@ -43,7 +43,7 @@ const modules = [
     icon: "📊",
     color: "#D500F9",
     description: "View business analytics and insights.",
-    roles: ["Super Admin"]  // Super Admin only
+    roles: ["Admin"]  // Admin only
   },
 ];
 
@@ -132,7 +132,7 @@ export default function DashboardScreen() {
       router.push({ pathname: './orders/new-order', params: { name, role } });
     } else if (action === 'product') {
       router.push({ pathname: './products/new-product', params: { role } });
-    } else if (action === 'staff' && (userRole === 'Super Admin' || userRole === 'Admin')) {
+    } else if (action === 'staff' && userRole === 'Admin') {
       router.push({ pathname: './staff/new-staff', params: { role } });
     }
   };
@@ -337,7 +337,7 @@ export default function DashboardScreen() {
                   <Text style={styles.quickActionIcon}>📦</Text>
                   <Text style={styles.quickActionLabel}>Products</Text>
                 </Pressable>
-                {(userRole === 'Super Admin' || userRole === 'Admin') && (
+                {userRole === 'Admin' && (
                   <Pressable 
                     style={styles.quickActionButton}
                     onPress={() => handleQuickAction('staff')}

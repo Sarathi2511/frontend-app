@@ -126,7 +126,7 @@ export default function LoginScreen() {
         router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
         
         // Show success toast with role-specific message after navigation
-        const roleMessage = data.role === 'Super Admin' ? 'Welcome back, Super Admin!' :
+        const roleMessage = 
                            data.role === 'Admin' ? 'Welcome back, Admin!' : 
                            data.role === 'Staff' ? 'Welcome back, Staff!' :
                            data.role === 'Executive' ? 'Welcome back, Executive!' :
@@ -222,7 +222,6 @@ export default function LoginScreen() {
             {showDemo && (
               <View style={styles.demoBox}>
                 <Text style={styles.demoText}>
-                  Super Admin: 8087779333 / shubham18{"\n"}
                   Admin: 1111111111 / adminpass{"\n"}
                   Staff: 2222222222 / staffpass{"\n"}
                   Executive: 3333333333 / execpass

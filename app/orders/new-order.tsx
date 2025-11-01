@@ -63,8 +63,6 @@ export default function NewOrderScreen() {
   const [price, setPrice] = useState("");
   const [showProductSearch, setShowProductSearch] = useState(false);
   
-  // No partial fulfillment at order creation - will be handled at dispatch time
-
   // Add a flag to track if we are returning from new-product
   const [reopenProductModal, setReopenProductModal] = useState(false);
 
@@ -339,7 +337,7 @@ export default function NewOrderScreen() {
         assignedToId: form.assignedToId,
         createdBy: params.name ? String(params.name) : "Unknown",
         urgent: form.urgent,
-        orderItems: orderItems, // Send all items - no partial fulfillment at creation
+        orderItems: orderItems,
         orderImage: form.orderImage || '',
         ...(scheduledFor ? { scheduledFor: scheduledFor.toISOString() } : {}),
         ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
@@ -382,8 +380,6 @@ export default function NewOrderScreen() {
   useEffect(() => {
     clearOrderItems();
   }, []);
-
-  // No need to initialize selectedItems - partial fulfillment handled at dispatch time
 
   // Add handlers for editing and deleting items
   const handleEditItem = (item: any, index: number) => {
@@ -447,8 +443,6 @@ export default function NewOrderScreen() {
       ]
     );
   };
-
-  // No checkbox toggle needed - partial fulfillment handled at dispatch time
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
@@ -1611,7 +1605,6 @@ orderCancelBtnText: {
   dropdownScrollView: {
     maxHeight: 200,
   },
-  // Checkbox styles for partial fulfillment
   orderItemCheckboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
