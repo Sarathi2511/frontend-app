@@ -24,7 +24,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
 
   const addOrderItem = useCallback((item: OrderItem) => {
-    setOrderItems(items => [...items, item]);
+    // Add unique temporary ID if not present
+    const itemWithId = { 
+      ...item, 
+      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` 
+    };
+    setOrderItems(items => [...items, itemWithId]);
   }, []);
 
   const removeOrderItem = useCallback((idx: number) => {
@@ -32,7 +37,12 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setAllOrderItems = useCallback((items: OrderItem[]) => {
-    setOrderItems(items);
+    // Add unique temporary IDs to items that don't have them
+    const itemsWithIds = items.map(item => ({
+      ...item,
+      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    }));
+    setOrderItems(itemsWithIds);
   }, []);
 
   const clearOrderItems = useCallback(() => {

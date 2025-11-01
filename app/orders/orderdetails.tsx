@@ -196,13 +196,13 @@ export default function OrderDetailsScreen() {
             <Detail label="Created By" value={order.createdBy} />
           </View>
 
-          {/* Order Items */}
-          <View style={styles.sectionCard}>
-            {sectionHeader('📦', 'Order Items')}
-            {order.orderItems && order.orderItems.length > 0 ? (
+          {/* Fulfilled Items - Show for partial orders */}
+          {order.isPartialOrder && order.fulfilledItems && order.fulfilledItems.length > 0 && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('✅', 'Fulfilled Items (Dispatched)')}
               <View style={styles.orderItemsContainer}>
-                {order.orderItems.map((item: any, idx: number) => (
-                  <View key={idx} style={styles.orderItemCard}>
+                {order.fulfilledItems.map((item: any, idx: number) => (
+                  <View key={item._tempId || item._id || `fulfilled-${idx}`} style={[styles.orderItemCard, styles.fulfilledItemCard]}>
                     <View style={styles.orderItemRow}>
                       {item.image || item.productImage ? (
                         <Image source={{ uri: item.image || item.productImage }} style={styles.productThumb} />
@@ -225,10 +225,76 @@ export default function OrderDetailsScreen() {
                   </View>
                 ))}
               </View>
-            ) : (
-              <Text style={styles.noItemsText}>No items in this order.</Text>
-            )}
-          </View>
+            </View>
+          )}
+
+          {/* Pending Items - Show for partial orders */}
+          {order.isPartialOrder && order.pendingItems && order.pendingItems.length > 0 && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('⏳', 'Pending Items (Not Yet Dispatched)')}
+              <View style={styles.orderItemsContainer}>
+                {order.pendingItems.map((item: any, idx: number) => (
+                  <View key={item._tempId || item._id || `pending-${idx}`} style={[styles.orderItemCard, styles.pendingItemCard]}>
+                    <View style={styles.orderItemRow}>
+                      {item.image || item.productImage ? (
+                        <Image source={{ uri: item.image || item.productImage }} style={styles.productThumb} />
+                      ) : (
+                        <View style={styles.productThumbPlaceholder}>
+                          <Ionicons name="cube-outline" size={28} color="#b0b3b8" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                        <View style={styles.orderItemMetaRow}>
+                          <Text style={styles.orderItemMeta}>Qty: {item.qty} × ₹{item.price}</Text>
+                          <Text style={styles.orderItemTotal}>₹{item.total}</Text>
+                        </View>
+                        {item.dimension && (
+                          <Text style={[styles.orderItemMeta, { marginTop: 2 }]}>{item.dimension}</Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* All Order Items - Show for non-partial orders */}
+          {!order.isPartialOrder && (
+            <View style={styles.sectionCard}>
+              {sectionHeader('📦', 'Order Items')}
+              {order.orderItems && order.orderItems.length > 0 ? (
+                <View style={styles.orderItemsContainer}>
+                  {order.orderItems.map((item: any, idx: number) => (
+                    <View key={item._tempId || item._id || `item-${idx}`} style={styles.orderItemCard}>
+                      <View style={styles.orderItemRow}>
+                        {item.image || item.productImage ? (
+                          <Image source={{ uri: item.image || item.productImage }} style={styles.productThumb} />
+                        ) : (
+                          <View style={styles.productThumbPlaceholder}>
+                            <Ionicons name="cube-outline" size={28} color="#b0b3b8" />
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
+                          <View style={styles.orderItemMetaRow}>
+                            <Text style={styles.orderItemMeta}>Qty: {item.qty} × ₹{item.price}</Text>
+                            <Text style={styles.orderItemTotal}>₹{item.total}</Text>
+                          </View>
+                          {item.dimension && (
+                            <Text style={[styles.orderItemMeta, { marginTop: 2 }]}>{item.dimension}</Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.noItemsText}>No items in this order.</Text>
+              )}
+            </View>
+          )}
 
           {/* Stock Status */}
           {stockStatus.length > 0 && (
@@ -471,6 +537,16 @@ const styles = StyleSheet.create({
     padding: androidUI.spacing.lg,
     marginBottom: androidUI.spacing.md,
     ...androidUI.shadow,
+  },
+  fulfilledItemCard: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#a5d6a7',
+    borderWidth: 1,
+  },
+  pendingItemCard: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#ffcc80',
+    borderWidth: 1,
   },
   orderItemRow: {
     flexDirection: 'row',

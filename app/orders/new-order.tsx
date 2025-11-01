@@ -800,7 +800,7 @@ export default function NewOrderScreen() {
                 <>
                   <View style={{ marginBottom: 18 }}>
                     {orderItems.map((item: any, idx: number) => (
-                      <View key={idx} style={styles.orderItemCard}>
+                      <View key={item._tempId || `item-${idx}`} style={styles.orderItemCard}>
                         <View style={styles.orderItemHeader}>
                           <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
                           <View style={styles.orderItemActions}>

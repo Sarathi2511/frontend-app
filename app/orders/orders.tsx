@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState, useCallback, useMemo, memo } from "react";
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
+import { useEffect, useState, useCallback, useMemo, memo, useRef } from "react";
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated, KeyboardAvoidingView } from "react-native";
 // Removed react-native-modal import - using built-in Modal instead
 import { useFocusEffect } from '@react-navigation/native';
 import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../utils/api";
@@ -136,6 +136,10 @@ const styles = StyleSheet.create({
   urgentChip: {
     backgroundColor: '#ffd1dc',
     borderColor: '#ffd1dc',
+  },
+  partialChip: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#fff3e0',
   },
   paymentChip: {
     backgroundColor: '#ffeaea',
@@ -932,6 +936,12 @@ const OrderCard = memo(({
               <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
             </View>
           )}
+          {item.isPartialOrder && (
+            <View style={[styles.statusChip, styles.partialChip]}>
+              <Ionicons name="file-tray-stacked" size={14} color="#ff6f00" style={{ marginRight: 4 }} />
+              <Text style={[styles.statusChipText, { color: '#ff6f00' }]}>Partial</Text>
+            </View>
+          )}
         </View>
       </View>
       
@@ -1082,8 +1092,11 @@ export default function OrdersScreen() {
   const [dispatchData, setDispatchData] = useState<any>(null);
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [invoiceCreated, setInvoiceCreated] = useState(false);
-  const [selectedDispatchItems, setSelectedDispatchItems] = useState<boolean[]>([]);
   const [dispatchUpdating, setDispatchUpdating] = useState(false);
+  const [dispatchQuantities, setDispatchQuantities] = useState<{[key: number]: string}>({});
+  const [pickerLayout, setPickerLayout] = useState<{x: number, y: number, width: number, height: number} | null>(null);
+  const deliveryPartnerPickerRef = useRef<View>(null);
+  const modalContainerRef = useRef<View>(null);
 
   // Payment State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -1424,8 +1437,14 @@ export default function OrdersScreen() {
     try {
       const response = await getDispatchConfirmation(pendingStatusChange.orderId);
       setDispatchData(response.data);
-      setSelectedDispatchItems(new Array(response.data.orderItems.length).fill(true));
       setInvoiceCreated(false);
+      
+      // Initialize dispatch quantities with original quantities
+      const initialQuantities: {[key: number]: string} = {};
+      response.data.orderItems.forEach((item: any, index: number) => {
+        initialQuantities[index] = String(item.qty);
+      });
+      setDispatchQuantities(initialQuantities);
     } catch (err: any) {
       console.error('Failed to load dispatch data:', err.response?.data || err.message);
       showToast('Failed to load dispatch data', 'error');
@@ -1433,12 +1452,6 @@ export default function OrdersScreen() {
     } finally {
       setDispatchLoading(false);
     }
-  };
-
-  const handleDispatchItemToggle = (index: number) => {
-    const newSelectedItems = [...selectedDispatchItems];
-    newSelectedItems[index] = !newSelectedItems[index];
-    setSelectedDispatchItems(newSelectedItems);
   };
 
   const handleDispatchConfirm = async () => {
@@ -1452,28 +1465,36 @@ export default function OrdersScreen() {
       return;
     }
 
-    const hasSelectedItems = selectedDispatchItems.some(selected => selected);
-    if (!hasSelectedItems) {
-      Alert.alert("Error", "Please select at least one item to dispatch");
+    // Prepare dispatch items with updated quantities
+    const dispatchItems = dispatchData.orderItems.map((item: any, index: number) => ({
+      ...item,
+      dispatchQty: Number(dispatchQuantities[index] || 0)
+    }));
+
+    // Validate quantities
+    const hasInvalidQty = dispatchItems.some((item: any) => {
+      const dispatchQty = item.dispatchQty;
+      return dispatchQty < 0 || dispatchQty > item.qty || isNaN(dispatchQty);
+    });
+
+    if (hasInvalidQty) {
+      Alert.alert("Error", "Please enter valid quantities (0 to original qty)");
       return;
     }
 
     setDispatchUpdating(true);
     try {
-      const selectedIndices = selectedDispatchItems
-        .map((selected, index) => selected ? index : -1)
-        .filter(index => index !== -1);
-
       await dispatchOrder(pendingStatusChange.orderId, {
         orderStatus: pendingStatusChange.newStatus,
         deliveryPartner: selectedDeliveryPartner,
-        dispatchItems: selectedIndices
+        dispatchItems: dispatchItems
       });
       
       setShowDispatchModal(false);
       setPendingStatusChange(null);
       setSelectedDeliveryPartner(null);
       setDispatchData(null);
+      setDispatchQuantities({});
       fetchAndSetOrders();
     } catch (err: any) {
       console.error('Dispatch failed:', err.response?.data || err.message);
@@ -1750,188 +1771,290 @@ export default function OrdersScreen() {
           visible={showDispatchModal}
           transparent={true}
           animationType="slide"
-          onRequestClose={() => setShowDispatchModal(false)}
+          onRequestClose={() => {
+            setShowDispatchModal(false);
+            setOpenDeliveryDropdown(false);
+            setPickerLayout(null);
+          }}
         >
-          <Pressable 
-            style={dispatchModalStyles.modalBackdrop}
-            onPress={() => setShowDispatchModal(false)}
-          >
-            <Pressable 
-              style={dispatchModalStyles.modalContainer}
-              onPress={(e) => e.stopPropagation()}
+          <View style={dispatchModalStyles.modalBackdrop}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={dispatchModalStyles.keyboardAvoid}
             >
-            {/* Header */}
-            <View style={dispatchModalStyles.modalHeader}>
-              <Text style={dispatchModalStyles.modalTitle}>Dispatch Confirmation</Text>
-            </View>
-            
-            {/* Content */}
-            <View style={dispatchModalStyles.modalContent}>
-              {dispatchLoading ? (
-                <View style={dispatchModalStyles.loadingContainer}>
-                  <ActivityIndicator size="large" color={ACCENT} />
-                  <Text style={dispatchModalStyles.loadingText}>Loading dispatch data...</Text>
+              <View ref={modalContainerRef} style={dispatchModalStyles.modalContainer}>
+                {/* Header */}
+                <View style={dispatchModalStyles.modalHeader}>
+                  <Text style={dispatchModalStyles.modalTitle}>Dispatch Confirmation</Text>
+                  <Pressable 
+                    style={dispatchModalStyles.closeButton}
+                    onPress={() => {
+                      setShowDispatchModal(false);
+                      setOpenDeliveryDropdown(false);
+                      setPickerLayout(null);
+                    }}
+                  >
+                    <Ionicons name="close" size={24} color="#666" />
+                  </Pressable>
                 </View>
-              ) : dispatchData ? (
-                <ScrollView 
-                  style={dispatchModalStyles.scrollView}
-                  showsVerticalScrollIndicator={false}
-                  bounces={false}
-                >
-                  {/* Invoice Created Checkbox */}
-                  <View style={[dispatchModalStyles.section, { marginTop: 16 }]}>
-                    <Pressable 
-                      style={dispatchModalStyles.checkboxRow}
-                      onPress={() => setInvoiceCreated(!invoiceCreated)}
-                    >
-                      <View style={[
-                        dispatchModalStyles.checkbox,
-                        invoiceCreated && dispatchModalStyles.checkboxSelected
-                      ]}>
-                        {invoiceCreated && <Ionicons name="checkmark" size={16} color="#fff" />}
-                      </View>
-                      <Text style={dispatchModalStyles.checkboxLabel}>Invoice has been created</Text>
-                    </Pressable>
+                
+                {/* Scrollable Content using FlatList */}
+                {dispatchLoading ? (
+                  <View style={dispatchModalStyles.loadingContainer}>
+                    <ActivityIndicator size="large" color={ACCENT} />
+                    <Text style={dispatchModalStyles.loadingText}>Loading dispatch data...</Text>
                   </View>
-
-                  {/* Delivery Partner Selection */}
-                  <View style={[dispatchModalStyles.section, { position: 'relative' }]}>
-                    <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
-                    <Pressable 
-                      style={dispatchModalStyles.deliveryPartnerPicker} 
-                      onPress={() => setOpenDeliveryDropdown(!openDeliveryDropdown)}
-                    >
-                      <Text style={styles.inputIcon}>🚚</Text>
-                      <Text style={[
-                        dispatchModalStyles.deliveryPartnerPickerText,
-                        !selectedDeliveryPartner && dispatchModalStyles.deliveryPartnerPickerPlaceholder
-                      ]}>
-                        {selectedDeliveryPartner ? 
-                          staffDropdownItems.find(item => item.value === selectedDeliveryPartner)?.label || 'Select Delivery Partner' :
-                          'Select Delivery Partner'
-                        }
-                      </Text>
-                      <Ionicons 
-                        name={openDeliveryDropdown ? "chevron-up" : "chevron-down"} 
-                        size={18} 
-                        color={ACCENT} 
-                      />
-                    </Pressable>
-                    
-                    {openDeliveryDropdown && (
+                ) : dispatchData ? (
+                  <FlatList
+                    data={dispatchData.orderItems}
+                    keyExtractor={(item, index) => `dispatch-item-${index}`}
+                    showsVerticalScrollIndicator={true}
+                    contentContainerStyle={dispatchModalStyles.flatListContent}
+                    removeClippedSubviews={false}
+                    style={{ zIndex: 1 }}
+                    ListHeaderComponent={
                       <>
-                        <Pressable 
-                          style={dispatchModalStyles.dropdownOverlay} 
-                          onPress={() => setOpenDeliveryDropdown(false)}
-                        />
-                        <View style={dispatchModalStyles.deliveryPartnerDropdown}>
-                          <ScrollView 
-                            style={dispatchModalStyles.dropdownScrollView}
-                            showsVerticalScrollIndicator={false}
-                            nestedScrollEnabled={true}
+                        {/* Invoice Created Checkbox */}
+                        <View style={[dispatchModalStyles.section, { marginTop: 16 }]}>
+                          <Pressable 
+                            style={dispatchModalStyles.checkboxRow}
+                            onPress={() => setInvoiceCreated(!invoiceCreated)}
                           >
-                            {staffDropdownItems.map((item) => (
-                              <Pressable
-                                key={item.value}
-                                style={({ pressed }) => [
-                                  dispatchModalStyles.deliveryPartnerOption,
-                                  selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionSelected,
-                                  pressed && { opacity: 0.7 }
-                                ]}
-                                onPress={() => { 
-                                  setSelectedDeliveryPartner(item.value); 
-                                  setOpenDeliveryDropdown(false); 
-                                }}
-                              >
-                                <Text style={styles.inputIcon}>👤</Text>
-                                <Text style={[
-                                  dispatchModalStyles.deliveryPartnerOptionText,
-                                  selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionTextSelected
-                                ]}>
-                                  {item.label}
-                                </Text>
-                              </Pressable>
-                            ))}
-                          </ScrollView>
+                            <View style={[
+                              dispatchModalStyles.checkbox,
+                              invoiceCreated && dispatchModalStyles.checkboxSelected
+                            ]}>
+                              {invoiceCreated && <Ionicons name="checkmark" size={16} color="#fff" />}
+                            </View>
+                            <Text style={dispatchModalStyles.checkboxLabel}>Invoice has been created</Text>
+                          </Pressable>
+                        </View>
+
+                        {/* Delivery Partner Selection */}
+                        <View style={dispatchModalStyles.section}>
+                          <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
+                          <View 
+                            ref={deliveryPartnerPickerRef}
+                            collapsable={false}
+                          >
+                            <Pressable 
+                              style={dispatchModalStyles.deliveryPartnerPicker} 
+                              onPress={() => {
+                                if (!openDeliveryDropdown && deliveryPartnerPickerRef.current && modalContainerRef.current) {
+                                  deliveryPartnerPickerRef.current.measure((px, py, width, height, pickerPageX, pickerPageY) => {
+                                    modalContainerRef.current?.measure((mx, my, mwidth, mheight, modalPageX, modalPageY) => {
+                                      // Calculate position relative to modal container
+                                      const relativeX = pickerPageX - modalPageX;
+                                      const relativeY = pickerPageY - modalPageY;
+                                      setPickerLayout({ x: relativeX, y: relativeY, width, height });
+                                    });
+                                  });
+                                }
+                                setOpenDeliveryDropdown(!openDeliveryDropdown);
+                              }}
+                            >
+                              <Text style={styles.inputIcon}>🚚</Text>
+                              <Text style={[
+                                dispatchModalStyles.deliveryPartnerPickerText,
+                                !selectedDeliveryPartner && dispatchModalStyles.deliveryPartnerPickerPlaceholder
+                              ]}>
+                                {selectedDeliveryPartner ? 
+                                  staffDropdownItems.find(item => item.value === selectedDeliveryPartner)?.label || 'Select Delivery Partner' :
+                                  'Select Delivery Partner'
+                                }
+                              </Text>
+                              <Ionicons 
+                                name={openDeliveryDropdown ? "chevron-up" : "chevron-down"} 
+                                size={18} 
+                                color={ACCENT} 
+                              />
+                            </Pressable>
+                          </View>
+                        </View>
+
+                        {/* Products Section Header */}
+                        <View style={[dispatchModalStyles.section, { zIndex: 1 }]}>
+                          <Text style={dispatchModalStyles.sectionTitle}>Products to Dispatch</Text>
+                          <Text style={dispatchModalStyles.sectionSubtitle}>
+                            Edit quantities to dispatch (0 = not dispatching this item)
+                          </Text>
                         </View>
                       </>
-                    )}
-                  </View>
-
-                  {/* Items Selection */}
-                  <View style={dispatchModalStyles.section}>
-                    <Text style={dispatchModalStyles.sectionTitle}>Items to Dispatch</Text>
-                    {dispatchData.orderItems.map((item: any, index: number) => (
-                      <View key={index} style={[
-                        dispatchModalStyles.dispatchItemCard,
-                        !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemCardUnselected
-                      ]}>
-                        <Pressable 
-                          style={dispatchModalStyles.itemRow}
-                          onPress={() => handleDispatchItemToggle(index)}
-                        >
-                          <View style={[
-                            dispatchModalStyles.checkbox,
-                            selectedDispatchItems[index] && dispatchModalStyles.checkboxSelected
-                          ]}>
-                            {selectedDispatchItems[index] && <Ionicons name="checkmark" size={16} color="#fff" />}
+                    }
+                    renderItem={({ item, index }) => (
+                      <View key={index} style={dispatchModalStyles.productCard}>
+                        <View style={dispatchModalStyles.productCardHeader}>
+                          <Text style={dispatchModalStyles.productName} numberOfLines={2}>{item.name}</Text>
+                          {item.dimension && (
+                            <Text style={dispatchModalStyles.productDimension}>{item.dimension}</Text>
+                          )}
+                        </View>
+                        
+                        <View style={dispatchModalStyles.productDetails}>
+                          <View style={dispatchModalStyles.productDetailRow}>
+                            <Text style={dispatchModalStyles.productLabel}>Original Qty:</Text>
+                            <Text style={dispatchModalStyles.productValue}>{item.qty}</Text>
                           </View>
-                          <View style={dispatchModalStyles.itemDetails}>
+                          <View style={dispatchModalStyles.productDetailRow}>
+                            <Text style={dispatchModalStyles.productLabel}>Price:</Text>
+                            <Text style={dispatchModalStyles.productValue}>₹{item.price}</Text>
+                          </View>
+                          <View style={dispatchModalStyles.productDetailRow}>
+                            <Text style={dispatchModalStyles.productLabel}>Available Stock:</Text>
                             <Text style={[
-                              dispatchModalStyles.dispatchItemName,
-                              !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemNameUnselected
-                            ]} numberOfLines={2}>
-                              {item.name}
-                            </Text>
-                            <Text style={[
-                              dispatchModalStyles.dispatchItemMeta,
-                              !selectedDispatchItems[index] && dispatchModalStyles.dispatchItemMetaUnselected
+                              dispatchModalStyles.productValue,
+                              !item.canFulfill && { color: '#ff5252', fontWeight: '700' }
                             ]}>
-                              Qty: {item.qty} | Stock: {item.availableStock} | Price: ₹{item.price}
+                              {item.availableStock}
+                              {!item.canFulfill && ' ⚠️'}
                             </Text>
-                            {!item.canFulfill && (
-                              <Text style={dispatchModalStyles.stockWarning}>⚠️ Insufficient stock</Text>
-                            )}
                           </View>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                </ScrollView>
-              ) : null}
-            </View>
+                        </View>
 
-            {/* Action Buttons - Sticky at Bottom */}
-            <View style={dispatchModalStyles.modalFooter}>
-              <Pressable
-                style={[dispatchModalStyles.actionButton, dispatchModalStyles.cancelButton]}
-                onPress={() => setShowDispatchModal(false)}
-              >
-                <Text style={dispatchModalStyles.cancelButtonText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  dispatchModalStyles.actionButton,
-                  dispatchModalStyles.dispatchButton,
-                  { 
-                    backgroundColor: (invoiceCreated && selectedDeliveryPartner && selectedDispatchItems.some(s => s)) ? ACCENT : '#eee' 
-                  }
-                ]}
-                onPress={handleDispatchConfirm}
-                disabled={!invoiceCreated || !selectedDeliveryPartner || !selectedDispatchItems.some(s => s) || dispatchUpdating}
-              >
-                <Text style={[
-                  dispatchModalStyles.dispatchButtonText,
-                  { 
-                    color: (invoiceCreated && selectedDeliveryPartner && selectedDispatchItems.some(s => s)) ? '#fff' : '#b0b3b8'
-                  }
-                ]}>
-                  {dispatchUpdating ? 'Dispatching...' : 'Dispatch Order'}
-                </Text>
-              </Pressable>
-            </View>
-            </Pressable>
-          </Pressable>
+                        <View style={dispatchModalStyles.qtyInputContainer}>
+                          <Text style={dispatchModalStyles.qtyInputLabel}>Dispatch Qty:</Text>
+                          <TextInput
+                            style={dispatchModalStyles.qtyInput}
+                            value={dispatchQuantities[index] || ''}
+                            onChangeText={(text) => {
+                              const newQuantities = { ...dispatchQuantities };
+                              newQuantities[index] = text;
+                              setDispatchQuantities(newQuantities);
+                            }}
+                            keyboardType="numeric"
+                            placeholder="0"
+                            maxLength={6}
+                          />
+                          <View style={dispatchModalStyles.qtyButtons}>
+                            <Pressable 
+                              style={dispatchModalStyles.qtyButton}
+                              onPress={() => {
+                                const current = Number(dispatchQuantities[index] || 0);
+                                if (current > 0) {
+                                  const newQuantities = { ...dispatchQuantities };
+                                  newQuantities[index] = String(current - 1);
+                                  setDispatchQuantities(newQuantities);
+                                }
+                              }}
+                            >
+                              <Ionicons name="remove" size={16} color="#666" />
+                            </Pressable>
+                            <Pressable 
+                              style={dispatchModalStyles.qtyButton}
+                              onPress={() => {
+                                const current = Number(dispatchQuantities[index] || 0);
+                                if (current < item.qty) {
+                                  const newQuantities = { ...dispatchQuantities };
+                                  newQuantities[index] = String(current + 1);
+                                  setDispatchQuantities(newQuantities);
+                                }
+                              }}
+                            >
+                              <Ionicons name="add" size={16} color="#666" />
+                            </Pressable>
+                          </View>
+                        </View>
+
+                        {!item.canFulfill && (
+                          <View style={dispatchModalStyles.stockWarningBanner}>
+                            <Ionicons name="warning" size={16} color="#ff5252" />
+                            <Text style={dispatchModalStyles.stockWarningText}>
+                              Insufficient stock! Only {item.availableStock} available.
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
+                  />
+                ) : null}
+
+                {/* Delivery Partner Dropdown - Rendered outside FlatList for proper z-index */}
+                {openDeliveryDropdown && pickerLayout && (
+                  <>
+                    <Pressable 
+                      style={dispatchModalStyles.dropdownOverlayFullScreen} 
+                      onPress={() => setOpenDeliveryDropdown(false)}
+                    />
+                    <View 
+                      style={[
+                        dispatchModalStyles.deliveryPartnerDropdownAbsolute,
+                        {
+                          top: pickerLayout.y + pickerLayout.height + 4,
+                          left: pickerLayout.x,
+                          width: pickerLayout.width,
+                        }
+                      ]}
+                      renderToHardwareTextureAndroid={true}
+                      needsOffscreenAlphaCompositing={true}
+                    >
+                      <ScrollView 
+                        style={dispatchModalStyles.dropdownScrollView}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {staffDropdownItems.map((item) => (
+                          <Pressable
+                            key={item.value}
+                            style={({ pressed }) => [
+                              dispatchModalStyles.deliveryPartnerOption,
+                              selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionSelected,
+                              pressed && { opacity: 0.7 }
+                            ]}
+                            onPress={() => { 
+                              setSelectedDeliveryPartner(item.value); 
+                              setOpenDeliveryDropdown(false); 
+                            }}
+                          >
+                            <Text style={styles.inputIcon}>👤</Text>
+                            <Text style={[
+                              dispatchModalStyles.deliveryPartnerOptionText,
+                              selectedDeliveryPartner === item.value && dispatchModalStyles.deliveryPartnerOptionTextSelected
+                            ]}>
+                              {item.label}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </>
+                )}
+
+                {/* Action Buttons - Sticky at Bottom */}
+                <View style={dispatchModalStyles.modalFooter}>
+                  <Pressable
+                    style={[dispatchModalStyles.actionButton, dispatchModalStyles.cancelButton]}
+                    onPress={() => {
+                      setShowDispatchModal(false);
+                      setOpenDeliveryDropdown(false);
+                      setPickerLayout(null);
+                    }}
+                  >
+                    <Text style={dispatchModalStyles.cancelButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      dispatchModalStyles.actionButton,
+                      dispatchModalStyles.dispatchButton,
+                      { 
+                        backgroundColor: (invoiceCreated && selectedDeliveryPartner) ? ACCENT : '#eee' 
+                      }
+                    ]}
+                    onPress={handleDispatchConfirm}
+                    disabled={!invoiceCreated || !selectedDeliveryPartner || dispatchUpdating}
+                  >
+                    <Text style={[
+                      dispatchModalStyles.dispatchButtonText,
+                      { 
+                        color: (invoiceCreated && selectedDeliveryPartner) ? '#fff' : '#b0b3b8'
+                      }
+                    ]}>
+                      {dispatchUpdating ? 'Dispatching...' : 'Dispatch Order'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
         </Modal>
 
         {/* Mark as Paid Modal */}
@@ -2095,39 +2218,46 @@ const dispatchModalStyles = StyleSheet.create({
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  keyboardAvoid: {
+    width: '100%',
+    maxHeight: '95%',
   },
   modalContainer: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    height: '90%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     width: '100%',
+    maxHeight: '100%',
     flexDirection: 'column',
-    marginTop: Platform.OS === 'ios' ? 44 : 24, // Safe area top
-    marginBottom: Platform.OS === 'ios' ? 34 : 24, // Safe area bottom
-    marginHorizontal: 16, // Small side margins
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 20,
+    position: 'relative',
   },
   modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 18,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    position: 'relative',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#333',
-    textAlign: 'center',
   },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
+  closeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
+    padding: 4,
   },
   modalFooter: {
     flexDirection: 'row',
@@ -2173,12 +2303,12 @@ const dispatchModalStyles = StyleSheet.create({
     paddingHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 9999,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    zIndex: 1000,
+    zIndex: 99999,
   },
   deliveryPartnerOption: {
     flexDirection: 'row',
@@ -2210,7 +2340,34 @@ const dispatchModalStyles = StyleSheet.create({
     right: -1000,
     bottom: -1000,
     backgroundColor: 'transparent',
-    zIndex: 999,
+    zIndex: 99998,
+    elevation: 9998,
+  },
+  dropdownOverlayFullScreen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 99997,
+    elevation: 9997,
+  },
+  deliveryPartnerDropdownAbsolute: {
+    position: 'absolute',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 9999,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    zIndex: 99999,
+    maxHeight: 200,
   },
   dropdownScrollView: {
     maxHeight: 200,
@@ -2231,6 +2388,14 @@ const dispatchModalStyles = StyleSheet.create({
   // Scroll view styles
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  flatListContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   
   // Section styles
@@ -2267,6 +2432,120 @@ const dispatchModalStyles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     color: '#333',
+    flex: 1,
+  },
+  
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+
+  // Product Card Styles
+  productCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+    zIndex: 1,
+  },
+  productCardHeader: {
+    marginBottom: 12,
+  },
+  productName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  productDimension: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  productDetails: {
+    marginBottom: 12,
+  },
+  productDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  productLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  productValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  qtyInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f3f6fa',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  qtyInputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginRight: 12,
+  },
+  qtyInput: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    textAlign: 'center',
+  },
+  qtyButtons: {
+    flexDirection: 'row',
+    marginLeft: 12,
+    gap: 8,
+  },
+  qtyButton: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  stockWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
+  },
+  stockWarningText: {
+    fontSize: 13,
+    color: '#ff5252',
+    fontWeight: '600',
+    marginLeft: 8,
     flex: 1,
   },
   

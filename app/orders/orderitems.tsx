@@ -252,7 +252,7 @@ export default function OrderItemsScreen() {
            {orderItems.length > 0 && (
              <View style={{ marginBottom: 18 }}>
                {orderItems.map((item: any, idx: number) => (
-                 <View key={idx} style={styles.orderItemCard}>
+                 <View key={item._tempId || `item-${idx}`} style={styles.orderItemCard}>
                    <View style={styles.orderItemCardTopRow}>
                      <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
                      <Pressable style={styles.removeOrderItemBtn} onPress={() => handleRemoveOrderItem(idx)}>
