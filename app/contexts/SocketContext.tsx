@@ -11,6 +11,7 @@ interface SocketContextType {
   connect: () => Promise<boolean>;
   disconnect: () => void;
   lastProductEvent: any;
+  lastStaffEvent: any;
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -31,10 +32,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastProductEvent, setLastProductEvent] = useState<any>(null);
+  const [lastStaffEvent, setLastStaffEvent] = useState<any>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationContext = useNotifications();
   const BASE_URL = 'https://backend-app-1qf1.onrender.com';
-  // const BASE_URL = 'http://192.168.1.2:5000';
+  // const BASE_URL = 'http://192.168.29.111:5000';
   
   // Memoize addNotification to prevent unnecessary re-renders
   const addNotification = useCallback((notification: any) => {
@@ -162,17 +164,17 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
       // Staff events (for admins only)
       newSocket.on('staff:created', (data) => {
+        setLastStaffEvent({ type: 'staff_created', data });
         addNotification({
           type: 'staff_created',
           title: 'Staff Created',
           message: `${data.staff.name} (${data.staff.role}) was created by ${data.createdBy.name}`,
           timestamp: new Date()
         });
-        // Show toast for new staff creation
-        // Toast notifications handled by individual components
       });
 
       newSocket.on('staff:updated', (data) => {
+        setLastStaffEvent({ type: 'staff_updated', data });
         addNotification({
           type: 'staff_updated',
           title: 'Staff Updated',
@@ -182,6 +184,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       });
 
       newSocket.on('staff:deleted', (data) => {
+        setLastStaffEvent({ type: 'staff_deleted', data });
         addNotification({
           type: 'staff_deleted',
           title: 'Staff Deleted',
@@ -263,6 +266,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     connect,
     disconnect,
     lastProductEvent,
+    lastStaffEvent,
   };
 
 

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getStaff, updateStaff } from "../utils/api";
-import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
@@ -14,7 +13,6 @@ const roleOptions = ["Admin", "Staff", "Executive"];
 export default function EditStaffScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     role: roleOptions[0],
@@ -36,7 +34,7 @@ export default function EditStaffScreen() {
               name: staffMember.name || '',
               role: staffMember.role || roleOptions[0],
               phone: staffMember.phone || '',
-              password: staffMember.password || '',
+              password: '', // Don't pre-fill password for security
             });
           }
         } catch (err) {
@@ -54,17 +52,20 @@ export default function EditStaffScreen() {
 
   const handleUpdate = async () => {
     setUpdating(true);
-    if (!form.name || !form.role || !form.phone || !form.password) {
-      Alert.alert("Error", "Please fill all fields.");
+    if (!form.name || !form.role || !form.phone) {
+      Alert.alert("Error", "Please fill all required fields.");
       setUpdating(false);
       return;
     }
-    const staffData = {
+    const staffData: any = {
       name: form.name,
       role: form.role,
       phone: form.phone,
-      password: form.password,
     };
+    // Only include password if it was changed
+    if (form.password && form.password.trim() !== '') {
+      staffData.password = form.password;
+    }
     try {
       await updateStaff(id as string, staffData);
       Alert.alert("Success", "Staff updated successfully!");
@@ -88,7 +89,7 @@ export default function EditStaffScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+        keyboardVerticalOffset={0}
       >
         <View style={styles.screenWrap}>
           {/* Modern Nav Bar */}
@@ -157,12 +158,12 @@ export default function EditStaffScreen() {
                 />
               </View>
               <View style={styles.floatingLabelInputWrap}>
-                <Text style={styles.floatingLabel}>Password</Text>
+                <Text style={styles.floatingLabel}>Password (Leave blank to keep current)</Text>
                 <TextInput
                   style={styles.input}
                   value={form.password}
                   onChangeText={v => handleChange('password', v)}
-                  placeholder="Enter password"
+                  placeholder="Enter new password (optional)"
                   placeholderTextColor="#b0b3b8"
                   secureTextEntry
                 />

@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { createStaff } from "../utils/api";
-import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
@@ -14,7 +13,6 @@ const roleOptions = ["Admin", "Staff", "Executive"];
 
 export default function NewStaffScreen() {
   const router = useRouter();
-  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     role: roleOptions[0],
@@ -315,42 +313,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  pickerModalSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-    maxHeight: 320,
-  },
-  pickerOption: {
-    paddingVertical: 14,
-    paddingHorizontal: androidUI.spacing.sm,
-    borderRadius: androidUI.borderRadius.small,
-    marginBottom: 2,
-    backgroundColor: '#f3f6fa',
-  },
-  pickerOptionSelected: {
-    backgroundColor: ACCENT,
-  },
-  pickerOptionText: {
-    color: androidUI.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  pickerOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
   orderSubmitBtn: {
     backgroundColor: ACCENT,
     borderRadius: androidUI.borderRadius.large,
@@ -383,26 +345,6 @@ const styles = StyleSheet.create({
   orderSubmitBtnPressed: {
     ...androidUI.buttonPress,
   },
-  pickerModalSheetCard: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.xxl,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-    maxHeight: 340,
-  },
-  pickerOptionCard: {
-    paddingVertical: 18,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderRadius: androidUI.borderRadius.medium,
-    marginBottom: 6,
-    backgroundColor: '#f3f6fa',
-  },
   btnContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -421,24 +363,6 @@ const styles = StyleSheet.create({
     color: ACCENT,
     fontWeight: '700',
     fontSize: 15,
-  },
-  toast: {
-    position: 'absolute',
-    left: androidUI.spacing.xxl,
-    right: androidUI.spacing.xxl,
-    bottom: 48,
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.large,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.cardShadow,
-    alignItems: 'center',
-  },
-  toastText: {
-    color: ACCENT,
-    fontWeight: '700',
-    fontSize: 16,
-    textAlign: 'center',
   },
   inlineDropdown: {
     position: 'absolute',

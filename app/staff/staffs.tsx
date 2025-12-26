@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteStaff, getStaff } from "../utils/api";
 import { useSocket } from "../contexts/SocketContext";
@@ -16,7 +16,7 @@ export default function StaffsScreen() {
   const [search, setSearch] = useState("");
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
   const [animatedHeight] = useState(new Animated.Value(0));
-  const { lastProductEvent } = useSocket();
+  const { lastStaffEvent } = useSocket();
 
   const fetchAndSetStaffs = async () => {
     setLoading(true);
@@ -36,13 +36,10 @@ export default function StaffsScreen() {
 
   // Listen for real-time staff updates
   useEffect(() => {
-    if (lastProductEvent) {
-      // Refresh staff list when real-time events occur
-      if (lastProductEvent.type === 'staff_created' || lastProductEvent.type === 'staff_updated' || lastProductEvent.type === 'staff_deleted') {
-        fetchAndSetStaffs();
-      }
+    if (lastStaffEvent) {
+      fetchAndSetStaffs();
     }
-  }, [lastProductEvent]);
+  }, [lastStaffEvent]);
 
   // Filter staff by search
   const filteredStaffs = staffs.filter(
