@@ -6,7 +6,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Animated, Dimensions, Modal, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
 import { getCurrentUserId, getOrdersAssignedTo, logout } from './utils/api';
-import NotificationButton from './components/NotificationButton';
 import { androidUI } from './utils/androidUI';
 
 const { width } = Dimensions.get("window");
@@ -195,7 +194,6 @@ export default function DashboardScreen() {
               <Text style={styles.userRole}>{userRole}</Text>
             </View>
             <View style={styles.headerActions}>
-              <NotificationButton />
               <Pressable 
                 style={({ pressed }) => [
                   styles.logoutButton,

@@ -190,7 +190,7 @@ export default function LoginScreen() {
       <View style={styles.loadingOverlay}>
         <View style={styles.loadingCard}>
           <AuthCheckSpinner />
-          <Text style={styles.loadingTitle}>Checking authentication...</Text>
+          <Text style={styles.loadingTitle}>Welcome to Sarathi !</Text>
           <ActivityIndicator 
             size="small" 
             color={ACCENT} 
