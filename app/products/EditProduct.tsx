@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, ActivityIndicator, Alert, Animated, SafeAreaView } from "react-native";
 import { getProducts, updateProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
-import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
@@ -31,7 +30,6 @@ const dimensionIcons: { [key: string]: string } = {
 export default function EditProductScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     brandName: '',

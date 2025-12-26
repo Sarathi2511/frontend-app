@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicator, Alert, TextInput, Animated, Modal } from "react-native";
-import { getProducts, deleteProduct, importProductsCSV, updateProductStock } from "../utils/api";
+import { getProducts, deleteProduct, importProductsCSV } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
 import { useSocket } from "../contexts/SocketContext";
@@ -22,17 +22,9 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const [animatedHeight] = useState(new Animated.Value(0));
-  const { isConnected, lastProductEvent } = useSocket();
+  const { lastProductEvent } = useSocket();
   const [importing, setImporting] = useState(false);
   const { showToast } = useToast();
-
-  // Stock update modal state
-  const [stockUpdateModal, setStockUpdateModal] = useState({
-    visible: false,
-    product: null as any,
-    stockToAdd: '',
-    loading: false
-  });
 
   // Import progress state
   const [importProgress, setImportProgress] = useState({
@@ -41,7 +33,6 @@ export default function ProductsScreen() {
     status: '',
     fileName: '',
     totalRows: 0,
-    processedRows: 0,
     created: 0,
     updated: 0,
     errors: [] as any[],
@@ -84,7 +75,7 @@ export default function ProductsScreen() {
       // Open the menu
       setExpandedProductId(productId);
       Animated.timing(animatedHeight, {
-        toValue: 180, // Height for three menu items
+        toValue: 120, // Height for two menu items (Edit and Delete)
         duration: 200,
         useNativeDriver: false,
       }).start();
@@ -130,45 +121,6 @@ export default function ProductsScreen() {
     );
   };
 
-  const handleUpdateStock = (product: any) => {
-    setExpandedProductId(null);
-    Animated.timing(animatedHeight, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: false,
-    }).start();
-    setStockUpdateModal({
-      visible: true,
-      product: product,
-      stockToAdd: '',
-      loading: false
-    });
-  };
-
-  const handleStockUpdateSubmit = async () => {
-    const stockToAdd = parseInt(stockUpdateModal.stockToAdd);
-    
-    if (!stockToAdd || stockToAdd <= 0) {
-      showToast('Please enter a valid positive number', 'error');
-      return;
-    }
-
-    setStockUpdateModal(prev => ({ ...prev, loading: true }));
-
-    try {
-      await updateProductStock(stockUpdateModal.product._id, stockToAdd);
-      setStockUpdateModal({ visible: false, product: null, stockToAdd: '', loading: false });
-      fetchAndSetProducts();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update stock', 'error');
-      setStockUpdateModal(prev => ({ ...prev, loading: false }));
-    }
-  };
-
-  const closeStockUpdateModal = () => {
-    setStockUpdateModal({ visible: false, product: null, stockToAdd: '', loading: false });
-  };
-
   const handleImportCSV = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ 
@@ -186,7 +138,6 @@ export default function ProductsScreen() {
         status: 'Starting import...',
         fileName: file.name || 'products.csv',
         totalRows: 0,
-        processedRows: 0,
         created: 0,
         updated: 0,
         errors: [],
@@ -228,7 +179,6 @@ export default function ProductsScreen() {
         progress: 100,
         status: 'Import completed!',
         totalRows: summary.totalRows || 0,
-        processedRows: summary.totalRows || 0,
         created: summary.created || 0,
         updated: summary.updated || 0,
         errors: summary.errors || [],
@@ -237,10 +187,6 @@ export default function ProductsScreen() {
       }));
 
       await fetchAndSetProducts();
-
-      // Show success message with details
-      const successMessage = `Import completed! ${summary.created} created, ${summary.updated} updated${summary.warnings.length > 0 ? `, ${summary.warnings.length} warnings` : ''}${summary.errors.length > 0 ? `, ${summary.errors.length} errors` : ''}`;
-
     } catch (e: any) {
       setImportProgress(prev => ({
         ...prev,
@@ -372,41 +318,41 @@ export default function ProductsScreen() {
                   </View>
                 )}
 
-                                 {importProgress.warnings.length > 0 && (
-                   <View style={styles.warningsContainer}>
-                     <Text style={styles.warningsTitle}>Warnings:</Text>
-                     <View style={styles.warningsList}>
-                       {importProgress.warnings.slice(0, 3).map((warning, index) => (
-                         <Text key={index} style={styles.warningText}>
-                           Row {warning.row}: {warning.message}
-                         </Text>
-                       ))}
-                       {importProgress.warnings.length > 3 && (
-                         <Text style={styles.warningText}>
-                           ...and {importProgress.warnings.length - 3} more warnings
-                         </Text>
-                       )}
-                     </View>
-                   </View>
-                 )}
+                {importProgress.warnings.length > 0 && (
+                  <View style={styles.warningsContainer}>
+                    <Text style={styles.warningsTitle}>Warnings:</Text>
+                    <View style={styles.warningsList}>
+                      {importProgress.warnings.slice(0, 3).map((warning, index) => (
+                        <Text key={index} style={styles.warningText}>
+                          Row {warning.row}: {warning.message}
+                        </Text>
+                      ))}
+                      {importProgress.warnings.length > 3 && (
+                        <Text style={styles.warningText}>
+                          ...and {importProgress.warnings.length - 3} more warnings
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
 
-                 {importProgress.errors.length > 0 && (
-                   <View style={styles.errorsContainer}>
-                     <Text style={styles.errorsTitle}>Errors Found:</Text>
-                     <View style={styles.errorsList}>
-                       {importProgress.errors.slice(0, 3).map((error, index) => (
-                         <Text key={index} style={styles.errorText}>
-                           Row {error.row}: {error.message}
-                         </Text>
-                       ))}
-                       {importProgress.errors.length > 3 && (
-                         <Text style={styles.errorText}>
-                           ...and {importProgress.errors.length - 3} more errors
-                         </Text>
-                       )}
-                     </View>
-                   </View>
-                 )}
+                {importProgress.errors.length > 0 && (
+                  <View style={styles.errorsContainer}>
+                    <Text style={styles.errorsTitle}>Errors Found:</Text>
+                    <View style={styles.errorsList}>
+                      {importProgress.errors.slice(0, 3).map((error, index) => (
+                        <Text key={index} style={styles.errorText}>
+                          Row {error.row}: {error.message}
+                        </Text>
+                      ))}
+                      {importProgress.errors.length > 3 && (
+                        <Text style={styles.errorText}>
+                          ...and {importProgress.errors.length - 3} more errors
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
 
                 <Pressable 
                   style={styles.closeButton} 
@@ -414,63 +360,6 @@ export default function ProductsScreen() {
                 >
                   <Text style={styles.closeButtonText}>Close</Text>
                 </Pressable>
-              </View>
-            </View>
-          </Modal>
-
-          {/* Stock Update Modal */}
-          <Modal
-            visible={stockUpdateModal.visible}
-            transparent={true}
-            animationType="fade"
-            onRequestClose={closeStockUpdateModal}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.stockUpdateModal}>
-                <View style={styles.stockUpdateHeader}>
-                  <Ionicons name="add-circle" size={32} color="#4CAF50" />
-                  <Text style={styles.stockUpdateTitle}>Update Stock</Text>
-                  <Text style={styles.stockUpdateProductName}>
-                    {stockUpdateModal.product?.name}
-                  </Text>
-                  <Text style={styles.stockUpdateCurrentStock}>
-                    Current Stock: {stockUpdateModal.product?.stockQuantity}
-                  </Text>
-                </View>
-
-                <View style={styles.stockUpdateInputContainer}>
-                  <Text style={styles.stockUpdateLabel}>Stock to Add:</Text>
-                  <TextInput
-                    style={styles.stockUpdateInput}
-                    placeholder="Enter quantity"
-                    value={stockUpdateModal.stockToAdd}
-                    onChangeText={(text) => setStockUpdateModal(prev => ({ ...prev, stockToAdd: text }))}
-                    keyboardType="numeric"
-                    autoFocus={true}
-                  />
-                </View>
-
-                <View style={styles.stockUpdateButtons}>
-                  <Pressable 
-                    style={[styles.stockUpdateButton, styles.cancelButton]} 
-                    onPress={closeStockUpdateModal}
-                    disabled={stockUpdateModal.loading}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </Pressable>
-                  
-                  <Pressable 
-                    style={[styles.stockUpdateButton, styles.submitButton, stockUpdateModal.loading && { opacity: 0.6 }]} 
-                    onPress={handleStockUpdateSubmit}
-                    disabled={stockUpdateModal.loading}
-                  >
-                    {stockUpdateModal.loading ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.submitButtonText}>Update Stock</Text>
-                    )}
-                  </Pressable>
-                </View>
               </View>
             </View>
           </Modal>
@@ -537,14 +426,6 @@ export default function ProductsScreen() {
                     >
                       <Ionicons name="pencil" size={18} color="#3D5AFE" />
                       <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit Product</Text>
-                    </Pressable>
-                    
-                    <Pressable 
-                      style={[styles.actionButton, styles.updateStockButton]} 
-                      onPress={() => handleUpdateStock(item)}
-                    >
-                      <Ionicons name="add-circle" size={18} color="#4CAF50" />
-                      <Text style={[styles.actionButtonText, styles.updateStockButtonText]}>Update Stock</Text>
                     </Pressable>
                     
                     {userRole === 'Admin' && (
@@ -614,11 +495,6 @@ const styles = StyleSheet.create({
     ...androidUI.cardShadow,
     marginHorizontal: 6,
     transitionDuration: '200ms',
-  },
-  cardPressed: {
-    ...androidUI.buttonPress,
-    shadowOpacity: 0.18,
-    elevation: 8,
   },
   cardRowTop: {
     flexDirection: 'row',
@@ -692,11 +568,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e3eaff',
   },
-  updateStockButton: {
-    backgroundColor: '#f0fff4',
-    borderWidth: 1,
-    borderColor: '#c6f6d5',
-  },
   deleteButton: {
     backgroundColor: '#fff5f5',
     borderWidth: 1,
@@ -709,9 +580,6 @@ const styles = StyleSheet.create({
   },
   editButtonText: {
     color: ACCENT,
-  },
-  updateStockButtonText: {
-    color: '#4CAF50',
   },
   deleteButtonText: {
     color: '#e53935',
@@ -911,85 +779,5 @@ const styles = StyleSheet.create({
   lowStockIndicator: {
     color: '#ff9800',
     fontSize: 12,
-  },
-  // Stock Update Modal Styles
-  stockUpdateModal: {
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.lg,
-    width: '85%',
-    alignItems: 'center',
-    ...androidUI.cardShadow,
-  },
-  stockUpdateHeader: {
-    alignItems: 'center',
-    marginBottom: androidUI.spacing.lg,
-  },
-  stockUpdateTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: androidUI.colors.text.primary,
-    marginTop: androidUI.spacing.sm,
-    marginBottom: androidUI.spacing.xs,
-  },
-  stockUpdateProductName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: ACCENT,
-    marginBottom: androidUI.spacing.xs,
-  },
-  stockUpdateCurrentStock: {
-    fontSize: 14,
-    color: androidUI.colors.text.secondary,
-  },
-  stockUpdateInputContainer: {
-    width: '100%',
-    marginBottom: androidUI.spacing.lg,
-  },
-  stockUpdateLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: androidUI.colors.text.primary,
-    marginBottom: androidUI.spacing.sm,
-  },
-  stockUpdateInput: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: androidUI.borderRadius.medium,
-    padding: androidUI.spacing.md,
-    fontSize: 16,
-    color: androidUI.colors.text.primary,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    textAlign: 'center',
-  },
-  stockUpdateButtons: {
-    flexDirection: 'row',
-    gap: androidUI.spacing.md,
-    width: '100%',
-  },
-  stockUpdateButton: {
-    flex: 1,
-    paddingVertical: androidUI.spacing.md,
-    borderRadius: androidUI.borderRadius.medium,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-  },
-  cancelButtonText: {
-    color: androidUI.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 }); 

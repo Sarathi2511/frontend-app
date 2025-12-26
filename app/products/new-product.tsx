@@ -4,7 +4,6 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { createProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
-import { useSocket } from "../contexts/SocketContext";
 import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
@@ -34,7 +33,6 @@ const dimensionIcons: { [key: string]: string } = {
 export default function NewProductScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { isConnected } = useSocket();
   const [form, setForm] = useState({
     name: '',
     brandName: '',
@@ -98,7 +96,7 @@ export default function NewProductScreen() {
     };
     try {
       await createProduct(productData);
-      // Navigate after showing toast
+      showToast('Product created successfully!', 'success');
       setTimeout(() => {
         if (params.returnTo === 'orderitems') {
           router.replace({ pathname: '/orders/orderitems', params: { productName: form.name } });
@@ -106,8 +104,9 @@ export default function NewProductScreen() {
           router.back();
         }
       }, 1500);
-    } catch (err) {
-      showToast('Failed to create product', 'error');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to create product';
+      showToast(errorMessage, 'error');
     }
   };
 
@@ -397,42 +396,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  pickerModalSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-    maxHeight: 320,
-  },
-  pickerOption: {
-    paddingVertical: 14,
-    paddingHorizontal: androidUI.spacing.sm,
-    borderRadius: androidUI.borderRadius.small,
-    marginBottom: 2,
-    backgroundColor: '#f3f6fa',
-  },
-  pickerOptionSelected: {
-    backgroundColor: ACCENT,
-  },
-  pickerOptionText: {
-    color: androidUI.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  pickerOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
   orderSubmitBtn: {
     backgroundColor: ACCENT,
     borderRadius: androidUI.borderRadius.large,
@@ -464,41 +427,6 @@ const styles = StyleSheet.create({
   },
   orderSubmitBtnPressed: {
     ...androidUI.buttonPress,
-  },
-  pickerModalSheetCard: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.xxl,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-    maxHeight: 340,
-  },
-  pickerOptionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderRadius: androidUI.borderRadius.medium,
-    marginBottom: 6,
-    backgroundColor: '#f3f6fa',
-  },
-  pickerOptionIcon: {
-    fontSize: 20,
-    marginRight: 12,
-  },
-  gradientBtnBg: {
-    flex: 1,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    width: '100%',
-    height: '100%',
   },
   btnContentRow: {
     flexDirection: 'row',

@@ -4,8 +4,8 @@ import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
 // Two URLS for development and production
-// const BASE_URL = 'http://192.168.29.111:5000/api';
-const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
+const BASE_URL = 'http://192.168.29.111:5000/api';
+// const BASE_URL = 'https://backend-app-1qf1.onrender.com/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -165,7 +165,6 @@ export const getCurrentUserId = async () => {
 export const getProducts = () => api.get('/products');
 export const createProduct = (data: any) => api.post('/products', data);
 export const updateProduct = (id: string, data: any) => api.put(`/products/${id}`, data);
-export const updateProductStock = (id: string, stockToAdd: number) => api.patch(`/products/${id}/stock`, { stockToAdd });
 export const deleteProduct = (id: string) => api.delete(`/products/${id}`);
 export const getBrands = () => api.get('/products/brands');
 
