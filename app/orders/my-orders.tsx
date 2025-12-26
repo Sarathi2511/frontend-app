@@ -1,15 +1,12 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useEffect, useState, useCallback, memo } from "react";
-import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, TextInput, ActivityIndicator, ScrollView, Alert, Animated } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { getOrdersAssignedTo, getStaff, getCurrentUserId, updateOrder, deleteOrder } from "../utils/api";
+import { FlatList, Platform, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Alert } from "react-native";
+import { getOrdersAssignedTo, getCurrentUserId } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
-import DropDownPicker from 'react-native-dropdown-picker';
 import { useSocket } from "../contexts/SocketContext";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
-const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
 
 function getStatusStyle(status: string) {
   switch (status) {
@@ -21,16 +18,7 @@ function getStatusStyle(status: string) {
   }
 }
 
-// Add MenuOption type
-interface MenuOption {
-  key: string;
-  label: string;
-  action: () => void;
-  destructive?: boolean;
-  disabled?: boolean;
-}
-
-// Simple Order Card Component (without three dots menu)
+// Order Card Component matching orders.tsx layout
 const OrderCard = memo(({ 
   item, 
   onPress 
@@ -38,64 +26,54 @@ const OrderCard = memo(({
   item: any; 
   onPress: (order: any) => void;
 }) => {
-  const handleCardPress = () => {
-    // Navigate to order details with the order ID
-    onPress(item);
-  };
-
   return (
     <Pressable
       style={({ pressed }) => [
         styles.card,
         pressed && styles.cardPressed
       ]}
-      onPress={handleCardPress}
+      onPress={() => onPress(item)}
     >
       {/* Line 1: Order ID */}
       <View style={styles.cardRowTop}>
         <Text style={styles.orderId}>{item.orderId}</Text>
       </View>
-      {/* Line 2: Name and status chips */}
+      
+      {/* Line 2: Customer Name and Order Status */}
       <View style={styles.cardRowMid}>
-        <Text style={styles.customerName}>{item.customerName}</Text>
+        <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
+        <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+          <Ionicons
+            name={
+              item.orderStatus === 'Pending' ? 'time-outline' :
+              item.orderStatus === 'Invoice' ? 'document-text-outline' :
+              item.orderStatus === 'Dispatched' ? 'send-outline' :
+              item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+            }
+            size={14}
+            color={item.orderStatus === 'Pending' ? '#b8860b' :
+                   item.orderStatus === 'Invoice' ? '#388e3c' :
+                   item.orderStatus === 'Dispatched' ? '#8e24aa' :
+                   item.orderStatus === 'DC' ? '#1976d2' : '#222'}
+            style={{ marginRight: 4 }}
+          />
+          <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+        </View>
+      </View>
+      
+      {/* Line 3: Order Route */}
+      <View style={styles.cardRowMid}>
         {item.orderRoute && (
           <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
         )}
-        <View style={styles.chipGroup}>
-          <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
-            <Ionicons
-              name={
-                item.orderStatus === 'Pending' ? 'time-outline' :
-                item.orderStatus === 'Invoice' ? 'document-text-outline' :
-                item.orderStatus === 'Dispatched' ? 'send-outline' :
-                item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-              }
-              size={14}
-              color={item.orderStatus === 'Pending' ? '#b8860b' :
-                     item.orderStatus === 'Invoice' ? '#388e3c' :
-                     item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                     item.orderStatus === 'DC' ? '#1976d2' : '#222'}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={styles.statusChipText}>{item.orderStatus}</Text>
-          </View>
-          {item.urgent && (
-            <View style={[styles.statusChip, styles.urgentChip]}>
-              <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-              <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-            </View>
-          )}
-        </View>
+        <View style={styles.chipGroup} />
       </View>
-      {/* Line 2.5: Total Price */}
-      <View style={{ marginTop: 4, marginBottom: 2 }}>
+      
+      {/* Line 4: Total Amount and Payment Badge */}
+      <View style={styles.cardRowMid}>
         <Text style={styles.orderCardTotal}>
-          Total: ₹{Array.isArray(item.orderItems) ? item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0) : 0}
+          Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
         </Text>
-      </View>
-      {/* Line 3: Created date and payment chip */}
-      <View style={styles.cardRowBot}>
-        <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
         {item.paymentMarkedBy && item.paymentRecievedBy ? (
           <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
             <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
@@ -108,25 +86,24 @@ const OrderCard = memo(({
           </View>
         ) : null}
       </View>
+      
+      {/* Line 5: Created At Date */}
+      <View style={styles.cardRowBot}>
+        <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
+      </View>
     </Pressable>
   );
 });
 
 export default function MyOrdersScreen() {
   const router = useRouter();
-  const { role, name } = useLocalSearchParams();
+  const { role } = useLocalSearchParams();
   const userRole = role ? String(role) : "User";
-  const userName = name ? String(name) : "Unknown";
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
-  const [staffList, setStaffList] = useState<any[]>([]);
-  const [staffLoading, setStaffLoading] = useState(false);
-  const [staffError, setStaffError] = useState<string | null>(null);
-  // Remove statusFilter state and logic
-
 
   // Fetch orders assigned to this user
   const fetchAndSetOrders = async () => {
@@ -146,29 +123,8 @@ export default function MyOrdersScreen() {
     setLoading(false);
   };
 
-  // Fetch staff list for menu actions
-  const fetchStaffList = async () => {
-    try {
-      setStaffLoading(true);
-      setStaffError(null);
-      const response = await getStaff();
-      if (Array.isArray(response.data)) {
-        setStaffList(response.data);
-      } else {
-        setStaffError('Failed to load staff list');
-        setStaffList([]);
-      }
-    } catch (err) {
-      setStaffError('Failed to connect to server');
-      setStaffList([]);
-    } finally {
-      setStaffLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchAndSetOrders();
-    fetchStaffList();
   }, []);
 
   useEffect(() => {
@@ -257,7 +213,7 @@ export default function MyOrdersScreen() {
   }, [socket]);
 
   // Navigate to order details when card is pressed
-  const handleMenu = (order: any) => {
+  const handleCardPress = (order: any) => {
     router.push({
       pathname: '/orders/orderdetails',
       params: { id: order.orderId }
@@ -265,7 +221,7 @@ export default function MyOrdersScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screenWrap} edges={['top', 'left', 'right']}>
+    <View style={styles.screenWrap}>
       {/* Header */}
       <View style={styles.headerBar}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
@@ -279,45 +235,57 @@ export default function MyOrdersScreen() {
         </View>
       ) : (
         <>
-        {/* Search Bar */}
-        <View style={styles.filterBar}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by Name or ID"
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-        <FlatList
-          data={filteredOrders}
-          keyExtractor={item => item._id}
-          contentContainerStyle={{ paddingBottom: 32 }}
-          renderItem={({ item }) => (
-            <OrderCard
-              item={item}
-              onPress={handleMenu}
-            />
-          )}
-          refreshing={refreshing}
-          onRefresh={fetchAndSetOrders}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyText}>No Orders Yet</Text>
+          {/* Search Bar */}
+          <View style={styles.filterBar}>
+            <View style={styles.searchRow}>
+              <Ionicons name="search" size={20} color="#b0b3b8" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by Name or ID"
+                placeholderTextColor="#666"
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <Pressable onPress={() => setSearch('')} style={styles.clearBtn}>
+                  <Ionicons name="close-circle" size={20} color="#b0b3b8" />
+                </Pressable>
+              )}
             </View>
-          )}
-        />
+          </View>
+          <FlatList
+            data={filteredOrders}
+            keyExtractor={item => item._id}
+            contentContainerStyle={{ paddingBottom: 32 }}
+            renderItem={({ item }) => (
+              <OrderCard
+                item={item}
+                onPress={handleCardPress}
+              />
+            )}
+            refreshing={refreshing}
+            onRefresh={fetchAndSetOrders}
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            initialNumToRender={10}
+            windowSize={10}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyWrap}>
+                <Text style={styles.emptyText}>No Orders Assigned</Text>
+              </View>
+            )}
+          />
         </>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screenWrap: {
     flex: 1,
-    backgroundColor: androidUI.colors.background,
-    paddingHorizontal: androidUI.spacing.lg,
-    paddingTop: 32,
+    backgroundColor: '#f5f7fa',
   },
   headerBar: {
     flexDirection: 'row',
@@ -331,7 +299,6 @@ const styles = StyleSheet.create({
     elevation: 4,
     zIndex: 10,
     minHeight: 68,
-    marginBottom: androidUI.spacing.lg,
   },
   backBtn: {
     backgroundColor: androidUI.colors.border,
@@ -353,9 +320,20 @@ const styles = StyleSheet.create({
     marginBottom: androidUI.spacing.md,
     ...androidUI.shadow,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchIcon: {
+    marginRight: androidUI.spacing.sm,
+  },
   searchInput: {
+    flex: 1,
     fontSize: 15,
     color: androidUI.colors.text.primary,
+  },
+  clearBtn: {
+    padding: 4,
   },
   loaderWrap: {
     flex: 1,
@@ -373,6 +351,7 @@ const styles = StyleSheet.create({
   },
   cardPressed: {
     ...androidUI.buttonPress,
+    transform: [{ scale: 1.02 }],
   },
   cardRowTop: {
     flexDirection: 'row',
@@ -385,25 +364,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: ACCENT,
   },
-  menuIconBtn: {
-    padding: 8,
-  },
   cardRowMid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   customerName: {
     fontSize: 15,
     fontWeight: '600',
     color: androidUI.colors.text.primary,
+    flex: 1,
+    marginRight: androidUI.spacing.sm,
   },
   orderRoute: {
     fontSize: 13,
     fontWeight: '500',
     color: androidUI.colors.text.secondary,
-    marginRight: androidUI.spacing.sm,
   },
   chipGroup: {
     flexDirection: 'row',
@@ -414,7 +391,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: androidUI.spacing.sm,
     borderRadius: androidUI.borderRadius.medium,
-    marginRight: androidUI.spacing.sm,
   },
   statusChipText: {
     fontSize: 12,
@@ -425,31 +401,31 @@ const styles = StyleSheet.create({
     borderColor: '#ffeeba',
   },
   statusDC: {
-    backgroundColor: '#d4edda',
-    borderColor: '#c3e6cb',
-  },
-  statusInvoice: {
     backgroundColor: '#e3f2fd',
     borderColor: '#bbdefb',
+  },
+  statusInvoice: {
+    backgroundColor: '#d4edda',
+    borderColor: '#c3e6cb',
   },
   statusDispatched: {
     backgroundColor: '#e1bee7',
     borderColor: '#d1c4e9',
   },
-  urgentChip: {
-    backgroundColor: '#ffebee',
-    borderColor: '#ffcdd2',
-  },
   orderCardTotal: {
     fontSize: 15,
-    fontWeight: '600',
-    color: ACCENT,
+    fontWeight: '700',
+    color: androidUI.colors.text.primary,
+  },
+  paymentChip: {
+    backgroundColor: '#ffebee',
+    borderColor: '#ffcdd2',
   },
   cardRowBot: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 4,
   },
   created: {
     fontSize: 13,
@@ -459,80 +435,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: ACCENT,
   },
-  paymentChip: {
-    backgroundColor: '#ffebee',
-    borderColor: '#ffcdd2',
-  },
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  menuSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    padding: androidUI.spacing.lg,
-    ...androidUI.modalShadow,
-  },
-  menuItem: {
-    paddingVertical: androidUI.spacing.md,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderRadius: androidUI.borderRadius.small,
-    marginBottom: androidUI.spacing.sm,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: androidUI.colors.text.primary,
-  },
-  menuItemDestructive: {
-    backgroundColor: '#ffebee',
-    borderColor: '#ffcdd2',
-  },
-  menuItemTextDestructive: {
-    color: '#d32f2f',
-  },
-  menuItemDisabled: {
-    opacity: 0.5,
-    backgroundColor: '#f0f0f0',
-  },
-  menuItemTextDisabled: {
-    color: '#9e9e9e',
-  },
-  dropdown: {
-    marginBottom: androidUI.spacing.md,
-  },
-  chipScroll: {
-    flexDirection: 'row',
-    marginBottom: androidUI.spacing.md,
-    paddingHorizontal: androidUI.spacing.sm,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: androidUI.spacing.md,
-    borderRadius: 20,
-    marginRight: androidUI.spacing.sm,
-    backgroundColor: '#e0e0e0',
-  },
-  chipActive: {
-    backgroundColor: ACCENT,
-  },
-  chipIcon: {
-    marginRight: 6,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: ACCENT,
-  },
-  chipTextActive: {
-    color: '#fff',
-  },
   emptyWrap: {
     flex: 1,
     justifyContent: 'center',
@@ -541,7 +443,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: androidUI.colors.text.secondary,
+    color: androidUI.colors.text.disabled,
     textAlign: 'center',
+    fontWeight: '600',
   },
-}); 
+});

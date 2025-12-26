@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
-import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes, completePartialOrder } from "../utils/api";
+import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
@@ -106,14 +106,11 @@ export default function EditOrderScreen() {
     assignedTo: '',
     assignedToId: '',
     payment: paymentOptions[0],
-    urgent: false,
     deliveryPartner: '',
     additionalNotes: '',
   });
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [completingPartial, setCompletingPartial] = useState(false);
-  const [isPartialOrder, setIsPartialOrder] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [assignedDropdownOpen, setAssignedDropdownOpen] = useState(false);
   const [deliveryPartnerDropdownOpen, setDeliveryPartnerDropdownOpen] = useState(false);
@@ -204,12 +201,9 @@ export default function EditOrderScreen() {
               assignedTo: order.assignedTo,
               assignedToId: order.assignedToId || '',
               payment: order.paymentCondition,
-              urgent: order.urgent || false,
               deliveryPartner: order.deliveryPartner || '',
               additionalNotes: order.additionalNotes || '',
             });
-            // Set partial order flag
-            setIsPartialOrder(order.isPartialOrder || false);
             // Add unique temp IDs to existing order items
             const itemsWithIds = (order.orderItems || []).map((item: any) => ({
               ...item,
@@ -440,7 +434,6 @@ export default function EditOrderScreen() {
       paymentCondition: form.payment,
       assignedTo: form.assignedTo,
       assignedToId: form.assignedToId,
-      urgent: form.urgent,
       orderItems: orderItems,
       deliveryPartner: form.deliveryPartner,
       ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
@@ -486,47 +479,6 @@ export default function EditOrderScreen() {
     }
   };
 
-  const handleCompletePartialOrder = async () => {
-    if (!id) {
-      Alert.alert("Error", "Invalid order ID");
-      return;
-    }
-
-    Alert.alert(
-      "Complete Partial Order",
-      "This will dispatch all remaining pending items. Are you sure?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Complete",
-          style: "default",
-          onPress: async () => {
-            setCompletingPartial(true);
-            try {
-              await completePartialOrder(id as string);
-              showToast('Partial order completed successfully!', 'success');
-              router.back();
-            } catch (err: any) {
-              console.error('Failed to complete partial order:', err);
-              const errorMessage = err.response?.data?.message || 'Failed to complete partial order';
-              const stockErrors = err.response?.data?.stockErrors;
-              
-              if (stockErrors && stockErrors.length > 0) {
-                Alert.alert(
-                  "Stock Errors",
-                  stockErrors.join('\n'),
-                  [{ text: "OK" }]
-                );
-              } else {
-                showToast(errorMessage, 'error');
-              }
-            }
-            setCompletingPartial(false);
-          }
-        }
-      ]
-    );
-  };
 
   // Memoized order total calculation
   const orderTotal = useMemo(() => {
@@ -840,7 +792,7 @@ export default function EditOrderScreen() {
           </View>
           {/* Divider */}
           <View style={styles.sectionDivider} />
-          {/* Payment & Urgent Toggles */}
+          {/* Payment Condition */}
           <View style={styles.sectionGroup}>
             <Text style={styles.floatingLabel}>Payment Condition</Text>
             <View style={styles.segmentedToggleRow}>
@@ -851,18 +803,6 @@ export default function EditOrderScreen() {
                   onPress={() => handleChange('payment', opt)}
                 >
                   <Text style={[styles.segmentedToggleText, form.payment === opt && styles.segmentedToggleTextActive]}>{opt}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={[styles.floatingLabel, { marginTop: 18 }]}>Urgent Order</Text>
-            <View style={styles.segmentedToggleRow}>
-              {[true, false].map(val => (
-                <Pressable
-                  key={val ? 'yes' : 'no'}
-                  style={[styles.segmentedToggleBtn, form.urgent === val && styles.segmentedToggleBtnActive, val && form.urgent ? styles.urgentToggleActive : null]}
-                  onPress={() => handleChange('urgent', val)}
-                >
-                  <Text style={[styles.segmentedToggleText, form.urgent === val && styles.segmentedToggleTextActive]}>{val ? 'Yes' : 'No'}</Text>
                 </Pressable>
               ))}
             </View>
@@ -1041,22 +981,6 @@ export default function EditOrderScreen() {
               </View>
             </View>
           </Modal>
-
-          {/* Complete Partial Order Button - Show only for partial orders */}
-          {isPartialOrder && form.orderStatus === 'Dispatched' && (
-            <Pressable 
-              style={({ pressed }) => [styles.completePartialBtn, pressed && styles.completePartialBtnPressed]} 
-              onPress={handleCompletePartialOrder} 
-              disabled={completingPartial}
-            >
-              <View style={styles.completePartialBtnContent}>
-                <Ionicons name="checkmark-done-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.completePartialBtnText}>
-                  {completingPartial ? 'Completing...' : 'Complete Partial Order'}
-                </Text>
-              </View>
-            </Pressable>
-          )}
 
           {/* Update Button */}
           <Pressable style={({ pressed }) => [styles.orderSubmitBtn, pressed && styles.orderSubmitBtnPressed]} onPress={handleUpdate} disabled={updating}>
@@ -1252,10 +1176,6 @@ const styles = StyleSheet.create({
     color: '#304ffe',
     fontWeight: '700',
   },
-  urgentToggleActive: {
-    backgroundColor: '#ffd1dc',
-    borderColor: '#ffd1dc',
-  },
   orderSubmitBtn: {
     backgroundColor: ACCENT,
     borderRadius: androidUI.borderRadius.large,
@@ -1275,31 +1195,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 18,
-    letterSpacing: 0.5,
-  },
-  completePartialBtn: {
-    backgroundColor: '#ff6f00',
-    borderRadius: androidUI.borderRadius.large,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: androidUI.spacing.md,
-    ...androidUI.cardShadow,
-    shadowColor: '#ff6f00',
-  },
-  completePartialBtnPressed: {
-    backgroundColor: '#f57c00',
-    ...androidUI.buttonPress,
-  },
-  completePartialBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completePartialBtnText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
     letterSpacing: 0.5,
   },
   orderCancelBtn: {

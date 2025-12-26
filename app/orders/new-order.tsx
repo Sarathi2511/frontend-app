@@ -1,11 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
-import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, Image, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-// @ts-ignore
-import DateTimePickerModal from 'react-native-modal-datetime-picker';
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../utils/api";
 import { useOrder } from "./OrderContext";
 import { useToast } from "../contexts/ToastContext";
@@ -15,8 +11,6 @@ const ACCENT = "#3D5AFE";
 const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
 // Remove mockStaff; use real staff from backend
 const paymentOptions = ["Immediate", "15 Days", "30 Days"];
-const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/duyuamwm2/image/upload'; // Replace <your_cloud_name>
-const CLOUDINARY_UPLOAD_PRESET = 'sarathiapp'; // Replace with your preset
 
 interface OrderItem {
   productId: string;
@@ -41,12 +35,8 @@ export default function NewOrderScreen() {
     assignedTo: '',
     assignedToId: '',
     payment: paymentOptions[0],
-    urgent: false,
-    image: null as string | null, // local uri
-    orderImage: null as string | null, // cloudinary url
     additionalNotes: '',
   });
-  const [imageUploading, setImageUploading] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [assignedDropdownOpen, setAssignedDropdownOpen] = useState(false);
   const [staffList, setStaffList] = useState<any[]>([]);
@@ -75,8 +65,6 @@ export default function NewOrderScreen() {
   const [statusChevronAnim] = useState(new Animated.Value(0));
   const [assignedChevronAnim] = useState(new Animated.Value(0));
 
-  const [scheduledFor, setScheduledFor] = useState<Date | null>(null);
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
   const [customerNameFocused, setCustomerNameFocused] = useState(false);
@@ -137,40 +125,6 @@ export default function NewOrderScreen() {
     setForm({ ...form, [field]: value });
   };
 
-  const handleImagePick = async () => {
-    setImageUploading(true);
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const localUri = result.assets[0].uri;
-      setForm(f => ({ ...f, image: localUri }));
-      // Upload to Cloudinary
-      try {
-        const formData = new FormData();
-        formData.append('file', {
-          uri: localUri,
-          type: 'image/jpeg',
-          name: 'order-image.jpg',
-        } as any);
-        formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
-        const response = await axios.post(CLOUDINARY_URL, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
-        if (response.data && response.data.secure_url) {
-          setForm(f => ({ ...f, orderImage: response.data.secure_url }));
-        } else {
-          Alert.alert('Error', 'Failed to upload image to Cloudinary.');
-        }
-      } catch (err) {
-        Alert.alert('Error', 'Failed to upload image to Cloudinary.');
-      }
-    }
-    setImageUploading(false);
-  };
 
   // Fetch products for search
   const fetchAndSetProducts = async (search: string) => {
@@ -336,10 +290,7 @@ export default function NewOrderScreen() {
         assignedTo: form.assignedTo,
         assignedToId: form.assignedToId,
         createdBy: params.name ? String(params.name) : "Unknown",
-        urgent: form.urgent,
         orderItems: orderItems,
-        orderImage: form.orderImage || '',
-        ...(scheduledFor ? { scheduledFor: scheduledFor.toISOString() } : {}),
         ...(form.additionalNotes ? { additionalNotes: form.additionalNotes } : {}),
       });
              if (isMounted.current) {
@@ -704,7 +655,7 @@ export default function NewOrderScreen() {
                   </>
                 )}
               </View>
-              {/* Payment & Urgent Toggles */}
+              {/* Payment Condition */}
               <Text style={styles.floatingLabel}>Payment Condition</Text>
               <View style={styles.segmentedToggleRow}>
                 {paymentOptions.map(opt => (
@@ -717,71 +668,6 @@ export default function NewOrderScreen() {
                   </Pressable>
                 ))}
               </View>
-              <Text style={[styles.floatingLabel, { marginTop: 18 }]}>Urgent Order <Text style={{ fontSize: 16 }}>⚡</Text></Text>
-              <View style={styles.segmentedToggleRow}>
-                {[true, false].map(val => (
-                  <Pressable
-                    key={val ? 'yes' : 'no'}
-                    style={[styles.segmentedToggleBtn, form.urgent === val && styles.segmentedToggleBtnActive, val && form.urgent ? styles.urgentToggleActive : null]}
-                    onPress={() => handleChange('urgent', val)}
-                  >
-                    <Text style={[styles.segmentedToggleText, form.urgent === val && styles.segmentedToggleTextActive]}>{val ? 'Yes' : 'No'}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              {/* Scheduled For Date/Time Picker */}
-              <View style={{ marginVertical: 12 }}>
-                <Text style={styles.floatingLabel}>Scheduled For</Text>
-                <Pressable
-                  style={[
-                    styles.dropdownPicker,
-                    styles.inputRow,
-                    styles.dropdownPickerEmphasis,
-                    { flex: 1, backgroundColor: '#f8fafd', borderColor: '#b0b3b8', paddingVertical: 16 }
-                  ]}
-                  onPress={() => setDatePickerVisibility(true)}
-                >
-                  <Text style={styles.inputIcon}>🗓️</Text>
-                  <Text style={[styles.dropdownPickerText, { color: scheduledFor ? '#22223b' : '#b0b3b8' }]}> 
-                    {scheduledFor ? scheduledFor.toLocaleString() : 'Select date & time'}
-                  </Text>
-                  <Ionicons name="calendar" size={18} color={ACCENT} style={{ marginLeft: 8 }} />
-                </Pressable>
-                {scheduledFor && (
-                  <Pressable
-                    onPress={() => setScheduledFor(null)}
-                    style={{ marginLeft: 10, padding: 6 }}
-                    accessibilityLabel="Clear scheduled date"
-                  >
-                    <Ionicons name="close-circle" size={22} color="#ff5252" />
-                  </Pressable>
-                )}
-                <DateTimePickerModal
-                  isVisible={isDatePickerVisible}
-                  mode="datetime"
-                  date={scheduledFor || new Date()}
-                  onConfirm={date => {
-                    setScheduledFor(date);
-                    setDatePickerVisibility(false);
-                  }}
-                  onCancel={() => setDatePickerVisibility(false)}
-                  minimumDate={new Date()}
-                />
-              </View>
-            </View>
-            {/* Divider */}
-            <View style={styles.sectionDivider} />
-            {/* ATTACHMENTS */}
-            <Text style={styles.sectionLabel}>Attachments</Text>
-            <View style={styles.sectionGroup}>
-              <Text style={styles.floatingLabel}>Order Image</Text>
-              <Pressable style={styles.uploadCard} onPress={handleImagePick}>
-                <Ionicons name="cloud-upload-outline" size={36} color={ACCENT} style={{ marginBottom: 10 }} />
-                <Text style={styles.uploadCardText}>{form.image ? 'Change Image' : 'Upload Image'}</Text>
-                {form.image && (
-                  <Image source={{ uri: form.image }} style={styles.uploadedImage} />
-                )}
-              </Pressable>
             </View>
             {/* Divider */}
             <View style={styles.sectionDivider} />
@@ -1066,27 +952,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
   },
-  imageUploadBtn: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  imageUploadBtnText: {
-    color: ACCENT,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  uploadedImage: {
-    width: 120,
-    height: 90,
-    borderRadius: 10,
-    marginTop: 6,
-    marginBottom: 8,
-    alignSelf: 'center',
-  },
   placeholderText: {
     color: '#b0b3b8',
     fontSize: 14,
@@ -1204,28 +1069,6 @@ orderCancelBtnText: {
   segmentedToggleTextActive: {
     color: '#fff',
     fontWeight: '700',
-  },
-  urgentToggleActive: {
-    backgroundColor: ACCENT,
-  },
-  uploadCard: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: androidUI.borderRadius.small,
-    paddingVertical: 28,
-    paddingHorizontal: androidUI.spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: androidUI.spacing.sm,
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    borderColor: ACCENT,
-    flexDirection: 'column',
-  },
-  uploadCardText: {
-    color: ACCENT,
-    fontWeight: '600',
-    fontSize: 15,
-    marginLeft: 10,
   },
   comingSoonContainer: {
     flexDirection: 'row',

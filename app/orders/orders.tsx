@@ -133,14 +133,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#222',
   },
-  urgentChip: {
-    backgroundColor: '#ffd1dc',
-    borderColor: '#ffd1dc',
-  },
-  partialChip: {
-    backgroundColor: '#fff3e0',
-    borderColor: '#fff3e0',
-  },
   paymentChip: {
     backgroundColor: '#ffeaea',
     borderColor: '#ffeaea',
@@ -224,30 +216,6 @@ const styles = StyleSheet.create({
   priorityWrap: {
     minWidth: 60,
     alignItems: 'flex-start',
-  },
-  urgentBadge: {
-    fontWeight: '700',
-    fontSize: 12,
-    borderRadius: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 10,
-    overflow: 'hidden',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  urgentRed: {
-    backgroundColor: '#ffd1dc', // light pink
-    color: '#c2185b', // deep pink text
-  },
-  urgentYellow: {
-    backgroundColor: '#fff3cd',
-    color: '#b8860b',
-  },
-  urgentBlank: {
-    color: 'transparent',
-    fontSize: 12,
-    paddingVertical: 2,
-    paddingHorizontal: 10,
   },
   total: {
     fontSize: 15,
@@ -930,18 +898,6 @@ const OrderCard = memo(({
           <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
         )}
         <View style={styles.chipGroup}>
-          {item.urgent && (
-            <View style={[styles.statusChip, styles.urgentChip]}>
-              <Ionicons name="alert-circle" size={14} color="#c2185b" style={{ marginRight: 4 }} />
-              <Text style={[styles.statusChipText, { color: '#c2185b' }]}>Urgent</Text>
-            </View>
-          )}
-          {item.isPartialOrder && (
-            <View style={[styles.statusChip, styles.partialChip]}>
-              <Ionicons name="file-tray-stacked" size={14} color="#ff6f00" style={{ marginRight: 4 }} />
-              <Text style={[styles.statusChipText, { color: '#ff6f00' }]}>Partial</Text>
-            </View>
-          )}
         </View>
       </View>
       
@@ -1011,8 +967,6 @@ const OrderCard = memo(({
                 >
                   <Ionicons
                     name={
-                      option.key === 'view' ? 'eye-outline' :
-                      option.key === 'print' ? 'print-outline' :
                       option.key === 'edit' ? 'create-outline' :
                       option.key === 'status' ? 'swap-horizontal' :
                       option.key === 'paid' ? 'checkmark-circle-outline' :
@@ -1093,7 +1047,6 @@ export default function OrdersScreen() {
   const [dispatchLoading, setDispatchLoading] = useState(false);
   const [invoiceCreated, setInvoiceCreated] = useState(false);
   const [dispatchUpdating, setDispatchUpdating] = useState(false);
-  const [dispatchQuantities, setDispatchQuantities] = useState<{[key: number]: string}>({});
   const [pickerLayout, setPickerLayout] = useState<{x: number, y: number, width: number, height: number} | null>(null);
   const deliveryPartnerPickerRef = useRef<View>(null);
   const modalContainerRef = useRef<View>(null);
@@ -1214,7 +1167,7 @@ export default function OrdersScreen() {
   // Animate dropdown expansion/collapse
   useEffect(() => {
     Animated.timing(animatedHeight, {
-      toValue: expandedOrderId ? 150 : 0,
+      toValue: expandedOrderId ? 100 : 0,
       duration: 300,
       useNativeDriver: false,
     }).start();
@@ -1315,11 +1268,6 @@ export default function OrdersScreen() {
     setShowStatusOptions(null);
   };
 
-  const handleViewDetails = () => {
-    closeMenu();
-    router.push({ pathname: '/orders/orderdetails', params: { id: menuOrder.orderId, role } });
-  };
-  const handlePrintPDF = () => { closeMenu(); alert('Print to PDF (mock)'); };
   const handleEditOrder = () => {
     closeMenu();
     router.push({ pathname: '/orders/EditOrder', params: { id: menuOrder.orderId, role } });
@@ -1438,13 +1386,6 @@ export default function OrdersScreen() {
       const response = await getDispatchConfirmation(pendingStatusChange.orderId);
       setDispatchData(response.data);
       setInvoiceCreated(false);
-      
-      // Initialize dispatch quantities with original quantities
-      const initialQuantities: {[key: number]: string} = {};
-      response.data.orderItems.forEach((item: any, index: number) => {
-        initialQuantities[index] = String(item.qty);
-      });
-      setDispatchQuantities(initialQuantities);
     } catch (err: any) {
       console.error('Failed to load dispatch data:', err.response?.data || err.message);
       showToast('Failed to load dispatch data', 'error');
@@ -1465,36 +1406,17 @@ export default function OrdersScreen() {
       return;
     }
 
-    // Prepare dispatch items with updated quantities
-    const dispatchItems = dispatchData.orderItems.map((item: any, index: number) => ({
-      ...item,
-      dispatchQty: Number(dispatchQuantities[index] || 0)
-    }));
-
-    // Validate quantities
-    const hasInvalidQty = dispatchItems.some((item: any) => {
-      const dispatchQty = item.dispatchQty;
-      return dispatchQty < 0 || dispatchQty > item.qty || isNaN(dispatchQty);
-    });
-
-    if (hasInvalidQty) {
-      Alert.alert("Error", "Please enter valid quantities (0 to original qty)");
-      return;
-    }
-
     setDispatchUpdating(true);
     try {
       await dispatchOrder(pendingStatusChange.orderId, {
         orderStatus: pendingStatusChange.newStatus,
-        deliveryPartner: selectedDeliveryPartner,
-        dispatchItems: dispatchItems
+        deliveryPartner: selectedDeliveryPartner
       });
       
       setShowDispatchModal(false);
       setPendingStatusChange(null);
       setSelectedDeliveryPartner(null);
       setDispatchData(null);
-      setDispatchQuantities({});
       fetchAndSetOrders();
     } catch (err: any) {
       console.error('Dispatch failed:', err.response?.data || err.message);
@@ -1560,10 +1482,7 @@ export default function OrdersScreen() {
 
   // Get available menu options based on role - memoized for performance
   const getMenuOptions = useCallback((): MenuOption[] => {
-    const options: MenuOption[] = [
-      { key: 'view', label: 'View Details', action: handleViewDetails },
-      { key: 'print', label: 'Print To PDF', action: handlePrintPDF },
-    ];
+    const options: MenuOption[] = [];
 
     // Add edit/status/payment options based on role
     if (['Admin', 'Staff'].includes(userRole)) {
@@ -1600,7 +1519,7 @@ export default function OrdersScreen() {
     }
 
     return options;
-  }, [userRole, menuOrder, handleViewDetails, handlePrintPDF, handleEditOrder, handleChangeStatus, handleMarkPaid, handleDeleteOrder]);
+  }, [userRole, menuOrder, handleEditOrder, handleChangeStatus, handleMarkPaid, handleDeleteOrder]);
 
   return (
     <View style={styles.screenWrap}>
@@ -1622,6 +1541,7 @@ export default function OrdersScreen() {
           <TextInput
             style={styles.searchInput}
             placeholder="Search by Name, ID, or Route"
+            placeholderTextColor="#666"
             value={search}
             onChangeText={setSearch}
           />
@@ -1876,7 +1796,7 @@ export default function OrdersScreen() {
                         <View style={[dispatchModalStyles.section, { zIndex: 1 }]}>
                           <Text style={dispatchModalStyles.sectionTitle}>Products to Dispatch</Text>
                           <Text style={dispatchModalStyles.sectionSubtitle}>
-                            Edit quantities to dispatch (0 = not dispatching this item)
+                            All items will be dispatched
                           </Text>
                         </View>
                       </>
@@ -1892,7 +1812,7 @@ export default function OrdersScreen() {
                         
                         <View style={dispatchModalStyles.productDetails}>
                           <View style={dispatchModalStyles.productDetailRow}>
-                            <Text style={dispatchModalStyles.productLabel}>Original Qty:</Text>
+                            <Text style={dispatchModalStyles.productLabel}>Quantity:</Text>
                             <Text style={dispatchModalStyles.productValue}>{item.qty}</Text>
                           </View>
                           <View style={dispatchModalStyles.productDetailRow}>
@@ -1908,50 +1828,6 @@ export default function OrdersScreen() {
                               {item.availableStock}
                               {!item.canFulfill && ' ⚠️'}
                             </Text>
-                          </View>
-                        </View>
-
-                        <View style={dispatchModalStyles.qtyInputContainer}>
-                          <Text style={dispatchModalStyles.qtyInputLabel}>Dispatch Qty:</Text>
-                          <TextInput
-                            style={dispatchModalStyles.qtyInput}
-                            value={dispatchQuantities[index] || ''}
-                            onChangeText={(text) => {
-                              const newQuantities = { ...dispatchQuantities };
-                              newQuantities[index] = text;
-                              setDispatchQuantities(newQuantities);
-                            }}
-                            keyboardType="numeric"
-                            placeholder="0"
-                            maxLength={6}
-                          />
-                          <View style={dispatchModalStyles.qtyButtons}>
-                            <Pressable 
-                              style={dispatchModalStyles.qtyButton}
-                              onPress={() => {
-                                const current = Number(dispatchQuantities[index] || 0);
-                                if (current > 0) {
-                                  const newQuantities = { ...dispatchQuantities };
-                                  newQuantities[index] = String(current - 1);
-                                  setDispatchQuantities(newQuantities);
-                                }
-                              }}
-                            >
-                              <Ionicons name="remove" size={16} color="#666" />
-                            </Pressable>
-                            <Pressable 
-                              style={dispatchModalStyles.qtyButton}
-                              onPress={() => {
-                                const current = Number(dispatchQuantities[index] || 0);
-                                if (current < item.qty) {
-                                  const newQuantities = { ...dispatchQuantities };
-                                  newQuantities[index] = String(current + 1);
-                                  setDispatchQuantities(newQuantities);
-                                }
-                              }}
-                            >
-                              <Ionicons name="add" size={16} color="#666" />
-                            </Pressable>
                           </View>
                         </View>
 
