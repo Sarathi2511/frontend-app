@@ -1,118 +1,263 @@
-import Constants from 'expo-constants';
 import { useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
-import { Animated, Dimensions, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons } from '@expo/vector-icons';
-import { androidUI } from "./utils/androidUI";
+import { useEffect, useState, useRef } from "react";
+import { Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View, ActivityIndicator } from "react-native";
+import { login } from "./utils/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { validateToken } from './utils/api';
+import { Ionicons } from '@expo/vector-icons';
+import { useSocket } from "./contexts/SocketContext";
+import { androidUI } from "./utils/androidUI";
+import { useToast } from "./contexts/ToastContext";
 
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
 
-export default function Welcome() {
+export default function LoginScreen() {
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+  const logoAnim = useState(new Animated.Value(0))[0];
   const buttonAnim = useRef(new Animated.Value(1)).current;
-  const iconAnim = useRef(new Animated.Value(0)).current;
+  const checkAuthAnim = useRef(new Animated.Value(0)).current;
+  const { connect } = useSocket();
+  const { showToast } = useToast();
 
+  // Check if user is already logged in and auto-redirect if valid token exists
   useEffect(() => {
-    let animationLoop: Animated.CompositeAnimation | null = null;
+    let isMounted = true;
     
-    // Start the animation loop
-    animationLoop = Animated.loop(
-      Animated.timing(iconAnim, {
-        toValue: 1,
-        duration: 1800,
-        useNativeDriver: true,
-      })
-    );
-    animationLoop.start();
-
-    // On landing, clear any invalid tokens but don't auto-navigate
-    const bootstrap = async () => {
+    const checkLoginStatus = async () => {
+      // Don't check login status if user is actively logging in
+      if (isLoggingIn || !isMounted) return;
+      
       try {
         const token = await AsyncStorage.getItem('token');
         const role = await AsyncStorage.getItem('userRole');
-        if (token && role) {
-          // Verify token with backend; if invalid, clear
-          await validateToken();
-          // Don't auto-navigate - let the login screen handle navigation
+        const name = await AsyncStorage.getItem('userName');
+        
+        if (token && role && isMounted) {
+          // Validate token with backend
+          const { success } = await (await import('./utils/api')).validateToken();
+          
+          if (success && isMounted) {
+            // Token is valid - auto-redirect to dashboard
+            // Establish WebSocket connection
+            await connect();
+            // Navigate to dashboard
+            router.replace({ 
+              pathname: "./dashboard", 
+              params: { role, name: name || 'User' } 
+            });
+            return;
+          }
         }
-      } catch {
-        // invalid token; ensure cleared
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('userRole');
-        await AsyncStorage.removeItem('userId');
-        await AsyncStorage.removeItem('userName');
+        
+        // Token invalid; ensure cleared
+        if (isMounted) {
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('userRole');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('userName');
+        }
+      } catch (error: any) {
+        // Clear invalid tokens and show appropriate message if needed
+        if (isMounted) {
+          await AsyncStorage.removeItem('token');
+          await AsyncStorage.removeItem('userRole');
+          await AsyncStorage.removeItem('userId');
+          await AsyncStorage.removeItem('userName');
+          
+          // Only show error toast for network issues, not for expired tokens
+          if (error.message && error.message.includes('Network error')) {
+            showToast('Network error. Please check your connection', 'error');
+          }
+        }
+      } finally {
+        if (isMounted) {
+          setCheckingAuth(false);
+        }
       }
     };
-    bootstrap();
-
-    // Cleanup animation on unmount
+    
+    checkLoginStatus();
+    
     return () => {
-      if (animationLoop) {
-        animationLoop.stop();
-      }
+      isMounted = false;
     };
-  }, []);
+  }, [showToast, isLoggingIn, connect, router]);
 
-  const spin = iconAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
+  // Animate auth check spinner
+  useEffect(() => {
+    if (checkingAuth) {
+      Animated.loop(
+        Animated.timing(checkAuthAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        })
+      ).start();
+    }
+  }, [checkingAuth]);
 
-  const handlePressIn = () => {
-    Animated.spring(buttonAnim, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      speed: 30,
-      bounciness: 8,
-    }).start();
-  };
-  const handlePressOut = () => {
-    Animated.spring(buttonAnim, {
+  useEffect(() => {
+    Animated.spring(logoAnim, {
       toValue: 1,
       useNativeDriver: true,
-      speed: 30,
-      bounciness: 8,
+      friction: 6,
+      tension: 80,
     }).start();
+  }, []);
+
+  const handleLogin = async () => {
+    if (!phone || !password) {
+      showToast('Please enter phone number and password', 'error');
+      return;
+    }
+    
+    // Animate button
+    Animated.sequence([
+      Animated.timing(buttonAnim, {
+        toValue: 0.96,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(buttonAnim, {
+        toValue: 1,
+        friction: 3,
+        tension: 80,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    setLoading(true);
+    setIsLoggingIn(true);
+    try {
+      const data = await login(phone, password);
+      if (data.token) {
+        // Store user name and userId for future use
+        await AsyncStorage.setItem('userName', data.name);
+        if (data.userId) await AsyncStorage.setItem('userId', data.userId);
+        
+        // Establish WebSocket connection after successful login
+        await connect();
+        
+        // Navigate immediately to dashboard
+        router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });
+      } else {
+        showToast('Login failed. Please try again', 'error');
+      }
+    } catch (err: any) {
+      // Show specific error message from the enhanced error handling
+      const errorMessage = err.message || 'Login failed. Please try again';
+      showToast(errorMessage, 'error');
+    } finally {
+      setLoading(false);
+      setIsLoggingIn(false);
+    }
   };
 
+  // Animated SVG spinner (simple)
+  const Spinner = () => (
+    <Animated.View style={{
+      transform: [{ rotate: logoAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+      marginBottom: 8,
+    }}>
+      <Ionicons name="cart" size={54} color={ACCENT} />
+    </Animated.View>
+  );
+
+  // Loading spinner for auth check
+  const AuthCheckSpinner = () => {
+    const spin = checkAuthAnim.interpolate({
+      inputRange: [0, 1],
+      outputRange: ['0deg', '360deg'],
+    });
+    
+    return (
+      <Animated.View style={{
+        transform: [{ rotate: spin }],
+      }}>
+        <Ionicons name="cart" size={48} color={ACCENT} />
+      </Animated.View>
+    );
+  };
+
+  // Show loading overlay while checking authentication
+  if (checkingAuth) {
+    return (
+      <View style={styles.loadingOverlay}>
+        <View style={styles.loadingCard}>
+          <AuthCheckSpinner />
+          <Text style={styles.loadingTitle}>Checking authentication...</Text>
+          <ActivityIndicator 
+            size="small" 
+            color={ACCENT} 
+            style={{ marginTop: 16 }}
+          />
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.gradientBg}>
-      <View style={styles.card}>
-        <View style={styles.illustrationWrap}>
-          <Animated.View style={{ transform: [{ rotate: spin }] }}>
-            <Ionicons name="cube" size={54} color={ACCENT} />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <View style={styles.gradientBg}>
+        <Animated.View
+          style={{
+            alignItems: "center",
+            opacity: logoAnim,
+            transform: [
+              {
+                translateY: logoAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-40, 0],
+                }),
+              },
+            ],
+          }}
+        >
+          <Spinner />
+          <Text style={styles.heading}>👋 Welcome Back</Text>
+          <Text style={styles.subheading}>Let's get you started</Text>
+        </Animated.View>
+        <View style={styles.formCard}>
+          <Text style={styles.title}>Sign in to your account</Text>
+          <TextInput
+            placeholder="Phone No"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            style={styles.input}
+            placeholderTextColor="#b0b3b8"
+          />
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            style={styles.input}
+            placeholderTextColor="#b0b3b8"
+          />
+          <Animated.View style={{ transform: [{ scale: buttonAnim }] }}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.button,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              <Text style={styles.buttonText}>{loading ? 'Logging in...' : 'Login'}</Text>
+            </Pressable>
           </Animated.View>
         </View>
-        <Text style={styles.heading}>Sarathi Orders</Text>
-        <Text style={styles.description}>
-          All your shop orders, products, and staff in one place.
-        </Text>
-        <Animated.View style={{ width: '100%', alignItems: 'center', transform: [{ scale: buttonAnim }] }}>
-          <Pressable
-            style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
-            android_ripple={{ color: '#e3e9f9' }}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            onPress={() => router.push("./login")}
-          >
-            <LinearGradient
-              colors={["#3b82f6", "#2563eb"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.buttonText}>Login</Text>
-            </LinearGradient>
-          </Pressable>
-        </Animated.View>
-        <Text style={styles.tagline}>New here? Contact your admin to register.</Text>
       </View>
-      <Text style={styles.versionInfo}>v{Constants.manifest?.version || '1.0.0'}</Text>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -124,70 +269,62 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     backgroundColor: androidUI.colors.background,
-    ...Platform.select({
-      ios: {
-        backgroundImage: 'linear-gradient(180deg, #f6f9fc 0%, #ffffff 100%)',
-      },
-      android: {
-        backgroundColor: androidUI.colors.background,
-      },
-      default: {},
-    }),
-  },
-  card: {
-    width: width * 0.9,
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: 40,
-    paddingHorizontal: 28,
-    alignItems: "center",
-    ...androidUI.modalShadow,
-  },
-  illustrationWrap: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: 32,
-    width: 64,
-    height: 64,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 32,
-    ...androidUI.shadow,
   },
   heading: {
-    fontSize: 26,
-    fontWeight: "800",
+    fontSize: 28,
+    fontWeight: '700',
     color: ACCENT,
-    marginBottom: 12,
-    textAlign: "center",
+    marginBottom: 2,
     fontFamily: androidUI.fontFamily.medium,
+  },
+  subheading: {
+    fontSize: 16,
+    color: androidUI.colors.text.secondary,
+    fontWeight: '500',
+    marginBottom: 18,
+    fontFamily: androidUI.fontFamily.regular,
+  },
+  formCard: {
+    width: width * 0.9,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    borderRadius: androidUI.borderRadius.xxlarge,
+    padding: 28,
+    alignItems: "center",
+    ...androidUI.modalShadow,
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 18,
+    color: androidUI.colors.text.primary,
+    fontWeight: "600",
+    fontFamily: androidUI.fontFamily.regular,
+    marginBottom: 22,
     letterSpacing: 0.2,
   },
-  description: {
-    fontSize: 15,
-    fontWeight: "400",
-    color: androidUI.colors.text.secondary,
-    marginBottom: 36,
-    textAlign: "center",
-    lineHeight: 22,
+  input: {
+    width: "100%",
+    borderWidth: 0,
+    borderRadius: androidUI.borderRadius.medium,
+    padding: androidUI.spacing.lg,
+    marginBottom: 18,
+    fontSize: 16,
+    backgroundColor: "#f3f6fa",
+    color: androidUI.colors.text.primary,
+    ...androidUI.shadow,
     fontFamily: androidUI.fontFamily.regular,
   },
   button: {
-    borderRadius: androidUI.borderRadius.xxlarge,
-    marginBottom: 10,
-    width: '100%',
-    alignItems: 'center',
-    transitionDuration: "200ms",
-    overflow: 'hidden',
-  },
-  buttonGradient: {
-    width: '100%',
+    backgroundColor: ACCENT,
     paddingVertical: 15,
     paddingHorizontal: 60,
     borderRadius: androidUI.borderRadius.xxlarge,
-    alignItems: 'center',
-    justifyContent: 'center',
+    ...androidUI.cardShadow,
+    shadowColor: ACCENT,
+    marginTop: 8,
+    transitionDuration: "200ms",
   },
   buttonPressed: {
+    backgroundColor: "#304ffe",
     ...androidUI.buttonPress,
   },
   buttonText: {
@@ -197,20 +334,30 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontFamily: androidUI.fontFamily.medium,
   },
-  tagline: {
-    color: androidUI.colors.text.disabled,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 18,
-    fontFamily: androidUI.fontFamily.regular,
+  loadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: androidUI.colors.background,
   },
-  versionInfo: {
-    position: 'absolute',
-    bottom: 18,
-    color: androidUI.colors.text.disabled,
-    fontSize: 11,
-    letterSpacing: 0.2,
+  loadingCard: {
+    width: width * 0.85,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.xxlarge,
+    paddingVertical: 50,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    ...androidUI.modalShadow,
+  },
+  loadingTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: androidUI.colors.text.primary,
+    marginTop: 24,
+    textAlign: 'center',
     fontFamily: androidUI.fontFamily.regular,
-    opacity: 0.5,
+    letterSpacing: 0.2,
   },
 });

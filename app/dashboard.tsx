@@ -152,7 +152,7 @@ export default function DashboardScreen() {
           onPress: async () => {
             try {
               await logout();
-              router.replace('/login');
+              router.replace('/');
             } catch (err) {
               console.error('Logout failed:', err);
               Alert.alert("Error", "Failed to logout. Please try again.");

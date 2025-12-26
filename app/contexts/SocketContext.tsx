@@ -35,8 +35,8 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [lastStaffEvent, setLastStaffEvent] = useState<any>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const notificationContext = useNotifications();
-  // const BASE_URL = 'https://backend-app-1qf1.onrender.com';
-  const BASE_URL = 'http://192.168.29.111:5000';
+  const BASE_URL = 'https://backend-app-1qf1.onrender.com';
+  // const BASE_URL = 'http://192.168.29.111:5000';
   
   // Memoize addNotification to prevent unnecessary re-renders
   const addNotification = useCallback((notification: any) => {
@@ -109,7 +109,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
                   // Force redirect to login with a small delay
                   setTimeout(() => {
                     try {
-                      router.replace('/login');
+                      router.replace('/');
                     } catch (redirectError) {
                       console.error('Failed to redirect to login from socket:', redirectError);
                     }
