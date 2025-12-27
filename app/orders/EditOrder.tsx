@@ -7,14 +7,17 @@ import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
-const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
+const orderStatusOptions = ["Pending", "DC", "Invoice", "Inv Check", "Inv Checked", "Dispatched"];
 
 // Define valid status transitions for strict workflow
+// Note: 'Inv Check' -> 'Inv Checked' is controlled by Inventory Manager only
 const getValidNextStatuses = (currentStatus: string): string[] => {
   const validTransitions = {
     'Pending': ['DC'],
     'DC': ['Invoice'],
-    'Invoice': ['Dispatched'],
+    'Invoice': ['Inv Check'],
+    'Inv Check': [], // No transitions for regular users - only Inventory Manager can progress this
+    'Inv Checked': ['Dispatched'],
     'Dispatched': [] // Final state, no further transitions
   };
   return validTransitions[currentStatus as keyof typeof validTransitions] || [];

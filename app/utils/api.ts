@@ -14,9 +14,12 @@ const api = axios.create({
 // Add a request interceptor to include the token
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Skip token for login endpoint
+    if (config.url !== '/login') {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -32,8 +35,11 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // If token expired or unauthorized, clear auth and bubble up
-    if (error?.response?.status === 401) {
+    // Skip interceptor handling for login endpoint (let login function handle its own errors)
+    const isLoginEndpoint = error?.config?.url === '/login';
+    
+    // If token expired or unauthorized (but not on login endpoint), clear auth and bubble up
+    if (error?.response?.status === 401 && !isLoginEndpoint) {
       console.log('Token expired or unauthorized - clearing auth data and redirecting to login');
       
       // Show user-friendly alert before redirecting
@@ -147,6 +153,8 @@ export const updateOrder = async (orderId: string, data: any) => {
 export const deleteOrder = (orderId: string) => api.delete(`/orders/by-order-id/${orderId}`);
 
 export const getOrdersAssignedTo = (userId: string) => api.get(`/orders/assigned/${userId}`);
+
+export const getOrdersByStatus = (status: string) => api.get(`/orders/by-status/${status}`);
 
 export const getCurrentUserId = async () => {
   return await AsyncStorage.getItem('userId');

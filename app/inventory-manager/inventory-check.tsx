@@ -1,26 +1,18 @@
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { useEffect, useState, useCallback, memo } from "react";
+import { useRouter } from "expo-router";
+import { useEffect, useState, memo } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Alert } from "react-native";
-import { getOrdersAssignedTo, getCurrentUserId } from "../utils/api";
+import { getOrdersByStatus } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "../contexts/SocketContext";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
 
-function getStatusStyle(status: string) {
-  switch (status) {
-    case 'Pending': return styles.statusPending;
-    case 'DC': return styles.statusDC;
-    case 'Invoice': return styles.statusInvoice;
-    case 'Inv Check': return styles.statusInvCheck;
-    case 'Inv Checked': return styles.statusInvChecked;
-    case 'Dispatched': return styles.statusDispatched;
-    default: return {};
-  }
+function getStatusStyle() {
+  return styles.statusInvCheck;
 }
 
-// Order Card Component matching orders.tsx layout
+// Order Card Component
 const OrderCard = memo(({ 
   item, 
   onPress 
@@ -44,56 +36,18 @@ const OrderCard = memo(({
       {/* Line 2: Customer Name and Order Status */}
       <View style={styles.cardRowMid}>
         <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
-        <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+        <View style={[styles.statusChip, getStatusStyle()]}>
           <Ionicons
-            name={
-              item.orderStatus === 'Pending' ? 'time-outline' :
-              item.orderStatus === 'Invoice' ? 'document-text-outline' :
-              item.orderStatus === 'Inv Check' ? 'checkmark-circle-outline' :
-              item.orderStatus === 'Inv Checked' ? 'checkmark-done-circle-outline' :
-              item.orderStatus === 'Dispatched' ? 'send-outline' :
-              item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-            }
+            name="checkmark-circle-outline"
             size={14}
-            color={item.orderStatus === 'Pending' ? '#b8860b' :
-                   item.orderStatus === 'Invoice' ? '#388e3c' :
-                   item.orderStatus === 'Inv Check' ? '#f57c00' :
-                   item.orderStatus === 'Inv Checked' ? '#00838f' :
-                   item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                   item.orderStatus === 'DC' ? '#1976d2' : '#222'}
+            color="#f57c00"
             style={{ marginRight: 4 }}
           />
           <Text style={styles.statusChipText}>{item.orderStatus}</Text>
         </View>
       </View>
       
-      {/* Line 3: Order Route */}
-      <View style={styles.cardRowMid}>
-        {item.orderRoute && (
-          <Text style={styles.orderRoute}>🛣️ {item.orderRoute}</Text>
-        )}
-        <View style={styles.chipGroup} />
-      </View>
-      
-      {/* Line 4: Total Amount and Payment Badge */}
-      <View style={styles.cardRowMid}>
-        <Text style={styles.orderCardTotal}>
-          Total: ₹{Array.isArray(item.orderItems) ? Math.round(item.orderItems.reduce((sum: number, oi: any) => sum + (oi.total || 0), 0)) : 0}
-        </Text>
-        {item.paymentMarkedBy && item.paymentRecievedBy ? (
-          <View style={[styles.statusChip, { backgroundColor: '#e8f5e9', borderColor: '#e8f5e9' }]}> 
-            <Ionicons name="checkmark-circle" size={14} color="#43a047" style={{ marginRight: 4 }} />
-            <Text style={[styles.statusChipText, { color: '#43a047' }]}>Paid</Text>
-          </View>
-        ) : item.paymentCondition === 'Immediate' ? (
-          <View style={[styles.statusChip, styles.paymentChip]}>
-            <Ionicons name="card" size={14} color="#ff5252" style={{ marginRight: 4 }} />
-            <Text style={[styles.statusChipText, { color: '#ff5252' }]}>Payment Due</Text>
-          </View>
-        ) : null}
-      </View>
-      
-      {/* Line 5: Created At Date */}
+      {/* Line 3: Created At Date */}
       <View style={styles.cardRowBot}>
         <Text style={styles.created}>Created: <Text style={styles.createdDate}>{new Date(item.date).toLocaleDateString()}</Text></Text>
       </View>
@@ -101,29 +55,25 @@ const OrderCard = memo(({
   );
 });
 
-export default function MyOrdersScreen() {
+export default function InventoryCheckScreen() {
   const router = useRouter();
-  const { role } = useLocalSearchParams();
-  const userRole = role ? String(role) : "User";
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Fetch orders assigned to this user
+  // Fetch orders with "Inv Check" status
   const fetchAndSetOrders = async () => {
     setRefreshing(true);
     try {
-      const userId = await getCurrentUserId();
-      if (!userId) throw new Error('User ID not found');
-      const response = await getOrdersAssignedTo(userId);
+      const response = await getOrdersByStatus('Inv Check');
       setOrders(response.data);
       setFilteredOrders(response.data);
-    } catch (err) {
+    } catch (err: any) {
       setOrders([]);
       setFilteredOrders([]);
-      Alert.alert("Error", "Failed to fetch orders");
+      Alert.alert("Error", err.response?.data?.message || "Failed to fetch orders");
     }
     setRefreshing(false);
     setLoading(false);
@@ -150,59 +100,42 @@ export default function MyOrdersScreen() {
   useEffect(() => {
     if (!socket) return;
 
-    // Listen for order creation events (only if assigned to current user)
-    const handleOrderCreated = async (data: any) => {
-      try {
-        const userId = await getCurrentUserId();
-        if (!userId) return;
-        
-        // Check if the new order is assigned to current user
-        if (data.order.assignedToId === userId) {
-          setOrders(prevOrders => {
-            const newOrder = data.order;
-            // Check if order already exists to avoid duplicates
-            const exists = prevOrders.find(order => order._id === newOrder._id);
-            if (exists) return prevOrders;
-            return [newOrder, ...prevOrders];
-          });
-        }
-      } catch (err) {
-        console.error('Error handling order created event:', err);
-      }
-    };
-
-    // Listen for order update events (only if assigned to current user)
-    const handleOrderUpdated = async (data: any) => {
-      try {
-        const userId = await getCurrentUserId();
-        if (!userId) return;
-        
-        // Check if the updated order is assigned to current user
-        if (data.order.assignedToId === userId) {
-          setOrders(prevOrders => 
-            prevOrders.map(order => 
-              order._id === data.order._id ? data.order : order
-            )
-          );
-        }
-      } catch (err) {
-        console.error('Error handling order updated event:', err);
-      }
-    };
-
-    // Listen for order deletion events (only if assigned to current user)
-    const handleOrderDeleted = async (data: any) => {
-      try {
-        const userId = await getCurrentUserId();
-        if (!userId) return;
-        
-        // Remove the order from the list if it was assigned to current user
+    // Listen for order update events (only for Inv Check status)
+    const handleOrderUpdated = (data: any) => {
+      const updatedOrder = data.order;
+      // If order status changed from Inv Check, remove it from list
+      if (updatedOrder.orderStatus !== 'Inv Check') {
         setOrders(prevOrders => 
-          prevOrders.filter(order => order._id !== data.orderId)
+          prevOrders.filter(order => order._id !== updatedOrder._id)
         );
-      } catch (err) {
-        console.error('Error handling order deleted event:', err);
+      } else {
+        // Update the order if it's still in Inv Check status
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order._id === updatedOrder._id ? updatedOrder : order
+          )
+        );
       }
+    };
+
+    // Listen for order creation events (only if status is Inv Check)
+    const handleOrderCreated = (data: any) => {
+      const newOrder = data.order;
+      if (newOrder.orderStatus === 'Inv Check') {
+        setOrders(prevOrders => {
+          // Check if order already exists to avoid duplicates
+          const exists = prevOrders.find(order => order._id === newOrder._id);
+          if (exists) return prevOrders;
+          return [newOrder, ...prevOrders];
+        });
+      }
+    };
+
+    // Listen for order deletion events
+    const handleOrderDeleted = (data: any) => {
+      setOrders(prevOrders => 
+        prevOrders.filter(order => order._id !== data.orderId)
+      );
     };
 
     // Add event listeners
@@ -218,11 +151,11 @@ export default function MyOrdersScreen() {
     };
   }, [socket]);
 
-  // Navigate to order details when card is pressed
+  // Navigate to inventory product screen when card is pressed
   const handleCardPress = (order: any) => {
     router.push({
-      pathname: '/orders/orderdetails',
-      params: { id: order.orderId }
+      pathname: './inventory-product',
+      params: { orderId: order.orderId }
     });
   };
 
@@ -233,7 +166,7 @@ export default function MyOrdersScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={22} color={ACCENT} />
         </Pressable>
-        <Text style={styles.headerTitle}>My Orders</Text>
+        <Text style={styles.headerTitle}>Inventory Check Orders</Text>
       </View>
       {loading ? (
         <View style={styles.loaderWrap}>
@@ -278,7 +211,9 @@ export default function MyOrdersScreen() {
             windowSize={10}
             ListEmptyComponent={() => (
               <View style={styles.emptyWrap}>
-                <Text style={styles.emptyText}>No Orders Assigned</Text>
+                <Ionicons name="checkbox-outline" size={64} color="#b0b3b8" style={{ marginBottom: 16 }} />
+                <Text style={styles.emptyText}>No Orders in Inventory Check</Text>
+                <Text style={styles.emptySubtext}>Orders with "Inv Check" status will appear here</Text>
               </View>
             )}
           />
@@ -319,41 +254,45 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     fontFamily: androidUI.fontFamily.medium,
   },
+  loaderWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   filterBar: {
     backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.medium,
-    padding: androidUI.spacing.md,
-    marginBottom: androidUI.spacing.md,
-    ...androidUI.shadow,
+    paddingVertical: androidUI.spacing.md,
+    paddingHorizontal: androidUI.spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: androidUI.colors.border,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f6f9fc',
+    borderRadius: androidUI.borderRadius.large,
+    paddingHorizontal: androidUI.spacing.md,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
   },
   searchIcon: {
     marginRight: androidUI.spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: androidUI.colors.text.primary,
+    paddingVertical: 0,
   },
   clearBtn: {
     padding: 4,
   },
-  loaderWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: androidUI.colors.background,
-  },
   card: {
     backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.medium,
+    borderRadius: androidUI.borderRadius.large,
     padding: androidUI.spacing.lg,
-    marginBottom: androidUI.spacing.md,
+    marginHorizontal: androidUI.spacing.lg,
+    marginTop: androidUI.spacing.md,
     ...androidUI.cardShadow,
-    shadowColor: ACCENT,
   },
   cardPressed: {
     ...androidUI.buttonPress,
@@ -383,14 +322,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: androidUI.spacing.sm,
   },
-  orderRoute: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: androidUI.colors.text.secondary,
-  },
-  chipGroup: {
-    flexDirection: 'row',
-  },
   statusChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -402,38 +333,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  statusPending: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffeeba',
-  },
-  statusDC: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#bbdefb',
-  },
-  statusInvoice: {
-    backgroundColor: '#d4edda',
-    borderColor: '#c3e6cb',
-  },
   statusInvCheck: {
     backgroundColor: '#fff3e0',
     borderColor: '#ffe0b2',
-  },
-  statusInvChecked: {
-    backgroundColor: '#e0f7fa',
-    borderColor: '#b2ebf2',
-  },
-  statusDispatched: {
-    backgroundColor: '#e1bee7',
-    borderColor: '#d1c4e9',
-  },
-  orderCardTotal: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-  },
-  paymentChip: {
-    backgroundColor: '#ffebee',
-    borderColor: '#ffcdd2',
   },
   cardRowBot: {
     flexDirection: 'row',
@@ -458,7 +360,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     color: androidUI.colors.text.disabled,
-    textAlign: 'center',
     fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: androidUI.colors.text.disabled,
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
+

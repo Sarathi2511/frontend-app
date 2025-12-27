@@ -1,10 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from "expo-router";
-// import * as ScreenOrientation from 'expo-screen-orientation';
-import { useEffect, useRef, useState } from "react";
-import { Alert, Animated, Dimensions, Modal, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Dimensions, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
 import { getCurrentUserId, getOrdersAssignedTo, logout } from './utils/api';
 import { androidUI } from './utils/androidUI';
 
@@ -46,12 +44,6 @@ const modules = [
   },
 ];
 
-
-
-const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
-const mockStaff = ["Ravi Kumar", "Priya Singh", "Amit Patel", "Sunita Rao"];
-const paymentOptions = ["Immediate", "15 Days", "30 Days"];
-
 export default function DashboardScreen() {
   const { role, name } = useLocalSearchParams();
   const userName = typeof name === 'string' ? name : Array.isArray(name) ? name[0] : "User";
@@ -60,6 +52,7 @@ export default function DashboardScreen() {
 
   const [myOrdersCount, setMyOrdersCount] = useState<number>(0);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [pressedCard, setPressedCard] = useState<string | null>(null);
 
 
 
@@ -99,32 +92,6 @@ export default function DashboardScreen() {
   // Filter modules based on user role
   const allowedModules = modules.filter(mod => mod.roles.includes(userRole));
   
-
-
-  const handleImagePick = async () => {
-    // setImageUploading(true); // Removed
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      // setOrderForm({ ...orderForm, image: result.assets[0].uri }); // Removed
-    }
-    // setImageUploading(false); // Removed
-  };
-
-  const handleOrderChange = (field: string, value: any) => {
-    // setOrderForm({ ...orderForm, [field]: value }); // Removed
-  };
-
-  const handleOrderSubmit = () => {
-    // For now, just log the order // Removed
-    // setOrderModal(false); // Removed
-    console.log('Order Submitted:', 'Order Form Data'); // Modified
-  };
-
   const handleQuickAction = (action: string) => {
     setShowQuickActions(false);
     if (action === 'order') {
@@ -161,9 +128,117 @@ export default function DashboardScreen() {
       ]
     );
   };
+  
+  // Show modules for Inventory Manager
+  if (userRole === 'Inventory Manager') {
+    const inventoryModules = [
+      {
+        key: "inventory-check",
+        title: "Inventory Check",
+        icon: "✅",
+        color: "#FF6F00",
+        description: "Review orders ready for inventory check."
+      },
+      {
+        key: "inventory",
+        title: "Inventory",
+        icon: "💡",
+        color: "#00C853",
+        description: "Check and update stock levels."
+      }
+    ];
 
-  // Helper for animated card
-  const [pressedCard, setPressedCard] = useState<string | null>(null);
+    return (
+      <View style={{ flex: 1 }}>
+        <LinearGradient
+          colors={["#e3e9f9", "#f5f7fa", "#f8fafc"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.bg}>
+          {/* Modern Header Card */}
+          <LinearGradient
+            colors={["#e3e9f9", "#f5f7fa"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.headerCard}
+          >
+            <View style={styles.headerRow}>
+              {/* Profile Circle */}
+              <View style={styles.profileCircle}>
+                <Text style={styles.profileInitials}>{initials}</Text>
+              </View>
+              <View style={{ flex: 1, marginLeft: 16 }}>
+                <Text style={styles.greetingText}>{greeting},</Text>
+                <Text style={styles.greetingName}>{firstName} <Text style={{ fontSize: 20 }}>👋</Text></Text>
+                <Text style={styles.userRole}>{userRole}</Text>
+              </View>
+              <View style={styles.headerActions}>
+                <Pressable 
+                  style={({ pressed }) => [
+                    styles.logoutButton,
+                    pressed && { opacity: 0.7 }
+                  ]} 
+                  onPress={handleLogout}
+                >
+                  <Ionicons name="log-out-outline" size={24} color={ACCENT} />
+                </Pressable>
+              </View>
+            </View>
+          </LinearGradient>
+          
+          {/* Modules Grid */}
+          <View style={styles.modulesWrap}>
+            {inventoryModules.map((mod) => {
+              const isPressed = pressedCard === mod.key;
+              return (
+                <RNAnimated.View
+                  key={mod.key}
+                  style={{
+                    transform: [
+                      { scale: isPressed ? 0.97 : 1 }
+                    ],
+                    shadowColor: mod.color,
+                    shadowOffset: { width: 0, height: isPressed ? 12 : 8 },
+                    shadowOpacity: isPressed ? 0.18 : 0.10,
+                    shadowRadius: isPressed ? 18 : 10,
+                    elevation: isPressed ? 12 : 6,
+                    marginBottom: 18,
+                    borderRadius: 16,
+                  }}
+                >
+                  <Pressable
+                    style={[styles.moduleCard, { borderColor: mod.color + '33', borderWidth: 1 }]}
+                    onPressIn={() => setPressedCard(mod.key)}
+                    onPressOut={() => setPressedCard(null)}
+                    onPress={() => {
+                      if (mod.key === 'inventory-check') {
+                        router.push({ pathname: './inventory-manager/inventory-check', params: { role, name } });
+                      } else if (mod.key === 'inventory') {
+                        router.push({ pathname: './products', params: { role } });
+                      }
+                    }}
+                  >
+                    <View style={[styles.iconCircle, { backgroundColor: mod.color + '22' }]}> 
+                      <Text style={{ fontSize: 28 }}>{mod.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.moduleTitle}>{mod.title}</Text>
+                      <Text style={styles.moduleDesc}>{mod.description}</Text>
+                    </View>
+                    <View style={styles.ctaArrowWrap}>
+                      <Ionicons name="chevron-forward" size={22} color={mod.color} />
+                    </View>
+                  </Pressable>
+                </RNAnimated.View>
+              );
+            })}
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -419,41 +494,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3f6fa',
     marginLeft: androidUI.spacing.sm,
   },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.xl,
-    marginBottom: androidUI.spacing.lg,
-    width: width * 0.92,
-    ...androidUI.cardShadow,
-    shadowColor: ACCENT,
-  },
-  avatar: {
-    width: 54,
-    height: 54,
-    borderRadius: 14,
-    marginRight: 18,
-  },
-  userName: {
-    fontSize: 19,
-    fontWeight: "700",
-    color: androidUI.colors.text.primary,
-    fontFamily: androidUI.fontFamily.medium,
-    marginBottom: 2,
-  },
-  sectionHeader: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: androidUI.colors.text.primary,
-    alignSelf: "flex-start",
-    marginLeft: width * 0.04,
-    marginBottom: 10,
-    marginTop: 2,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
-  },
   modulesWrap: {
     width: width * 0.92,
     flexDirection: "column",
@@ -485,164 +525,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: androidUI.colors.text.secondary,
     fontFamily: androidUI.fontFamily.regular,
-  },
-
-  orderModalSheetWrap: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  orderModalSheet: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
-    minHeight: 480,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 12,
-  },
-  orderHeader: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: ACCENT,
-    marginBottom: 18,
-    textAlign: 'center',
-    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
-  },
-  input: {
-    width: '100%',
-    borderWidth: 0,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 18,
-    fontSize: 16,
-    backgroundColor: '#f3f6fa',
-    color: '#222',
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif",
-  },
-  dropdownWrap: {
-    marginBottom: 18,
-  },
-  dropdownLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#22223b',
-    marginBottom: 8,
-    fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
-  },
-  dropdownBox: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  dropdownOption: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  dropdownOptionSelected: {
-    backgroundColor: ACCENT,
-  },
-  dropdownOptionText: {
-    color: '#22223b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  dropdownOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  radioRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  radioBtn: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-  },
-  radioBtnSelected: {
-    backgroundColor: ACCENT,
-  },
-  radioBtnText: {
-    color: '#22223b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  radioBtnTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  imageUploadBtn: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  imageUploadBtnText: {
-    color: ACCENT,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  uploadedImage: {
-    width: 120,
-    height: 90,
-    borderRadius: 10,
-    marginTop: 6,
-    marginBottom: 8,
-    alignSelf: 'center',
-  },
-  placeholderText: {
-    color: '#b0b3b8',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
-  orderSubmitBtn: {
-    backgroundColor: ACCENT,
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-    shadowColor: ACCENT,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  orderSubmitBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-    letterSpacing: 0.5,
-  },
-  orderCancelBtn: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 2,
-    marginBottom: 8,
-  },
-  orderCancelBtnText: {
-    color: ACCENT,
-    fontWeight: '600',
-    fontSize: 15,
   },
   dashboardTitleWrap: {
     width: width * 0.92,
@@ -737,5 +619,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: androidUI.colors.text.primary,
     fontFamily: androidUI.fontFamily.medium,
+  },
+  welcomeContainer: {
+    width: width * 0.92,
+    backgroundColor: androidUI.colors.surface,
+    borderRadius: androidUI.borderRadius.xxlarge,
+    padding: androidUI.spacing.xxl * 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...androidUI.cardShadow,
+    shadowColor: ACCENT,
+    marginTop: androidUI.spacing.xl,
+  },
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: ACCENT,
+    textAlign: 'center',
+    fontFamily: androidUI.fontFamily.medium,
+    letterSpacing: 0.5,
   },
 }); 

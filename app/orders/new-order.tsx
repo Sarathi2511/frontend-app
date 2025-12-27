@@ -8,7 +8,7 @@ import { useToast } from "../contexts/ToastContext";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
-const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
+const orderStatusOptions = ["Pending", "DC", "Invoice", "Inv Check", "Inv Checked", "Dispatched"];
 // Remove mockStaff; use real staff from backend
 const paymentOptions = ["Immediate", "15 Days", "30 Days"];
 

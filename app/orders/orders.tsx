@@ -13,14 +13,17 @@ import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 
-const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
+const statusOptions = ["Pending", "DC", "Invoice", "Inv Check", "Inv Checked", "Dispatched"];
 
 // Define valid status transitions for flexible workflow
+// Note: 'Inv Check' -> 'Inv Checked' is controlled by Inventory Manager only
 const getValidNextStatuses = (currentStatus: string): string[] => {
   const validTransitions = {
     'Pending': ['DC'],
-    'DC': ['Invoice', 'Dispatched'], // Allow both Invoice and Dispatched from DC
-    'Invoice': ['Dispatched'],
+    'DC': ['Invoice'], // Only Invoice allowed from DC
+    'Invoice': ['Inv Check'],
+    'Inv Check': [], // No transitions for regular users - only Inventory Manager can progress this
+    'Inv Checked': ['Dispatched'],
     'Dispatched': [] // Final state, no further transitions
   };
   return validTransitions[currentStatus as keyof typeof validTransitions] || [];
@@ -208,6 +211,14 @@ const styles = StyleSheet.create({
   statusInvoice: {
     backgroundColor: '#e8f5e9',
     color: '#388e3c',
+  },
+  statusInvCheck: {
+    backgroundColor: '#fff3e0',
+    color: '#f57c00',
+  },
+  statusInvChecked: {
+    backgroundColor: '#e0f7fa',
+    color: '#00838f',
   },
   statusDispatched: {
     backgroundColor: '#f3e5f5',
@@ -815,6 +826,8 @@ function getStatusStyle(status: string) {
     case 'Pending': return styles.statusPending;
     case 'DC': return styles.statusDC;
     case 'Invoice': return styles.statusInvoice;
+    case 'Inv Check': return styles.statusInvCheck;
+    case 'Inv Checked': return styles.statusInvChecked;
     case 'Dispatched': return styles.statusDispatched;
     default: return {};
   }
@@ -875,15 +888,19 @@ const OrderCard = memo(({
         <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
         <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
           <Ionicons
-            name={
-              item.orderStatus === 'Pending' ? 'time-outline' :
-              item.orderStatus === 'Invoice' ? 'document-text-outline' :
-              item.orderStatus === 'Dispatched' ? 'send-outline' :
-              item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-            }
+                    name={
+                      item.orderStatus === 'Pending' ? 'time-outline' :
+                      item.orderStatus === 'Invoice' ? 'document-text-outline' :
+                      item.orderStatus === 'Inv Check' ? 'checkmark-circle-outline' :
+                      item.orderStatus === 'Inv Checked' ? 'checkmark-done-circle-outline' :
+                      item.orderStatus === 'Dispatched' ? 'send-outline' :
+                      item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+                    }
             size={14}
-            color={item.orderStatus === 'Pending' ? '#b8860b' :
+                    color={item.orderStatus === 'Pending' ? '#b8860b' :
                    item.orderStatus === 'Invoice' ? '#388e3c' :
+                   item.orderStatus === 'Inv Check' ? '#f57c00' :
+                   item.orderStatus === 'Inv Checked' ? '#00838f' :
                    item.orderStatus === 'Dispatched' ? '#8e24aa' :
                    item.orderStatus === 'DC' ? '#1976d2' : '#222'}
             style={{ marginRight: 4 }}
@@ -941,6 +958,8 @@ const OrderCard = memo(({
                       status === 'Pending' ? 'time-outline' :
                       status === 'DC' ? 'cube-outline' :
                       status === 'Invoice' ? 'document-text-outline' :
+                      status === 'Inv Check' ? 'checkmark-circle-outline' :
+                      status === 'Inv Checked' ? 'checkmark-done-circle-outline' :
                       status === 'Dispatched' ? 'send-outline' : 'ellipse-outline'
                     }
                     size={20}
@@ -1027,6 +1046,8 @@ export default function OrdersScreen() {
     Pending: 0,
     DC: 0,
     Invoice: 0,
+    'Inv Check': 0,
+    'Inv Checked': 0,
     Dispatched: 0
   });
   
@@ -1086,6 +1107,8 @@ export default function OrdersScreen() {
         Pending: 0,
         DC: 0,
         Invoice: 0,
+        'Inv Check': 0,
+        'Inv Checked': 0,
         Dispatched: 0
       };
       
@@ -1099,7 +1122,7 @@ export default function OrdersScreen() {
     } catch (err) {
       setOrders([]);
       setFilteredOrders([]);
-      setOrderCounts({ Pending: 0, DC: 0, Invoice: 0, Dispatched: 0 });
+      setOrderCounts({ Pending: 0, DC: 0, Invoice: 0, 'Inv Check': 0, 'Inv Checked': 0, Dispatched: 0 });
       Alert.alert("Error", "Failed to fetch orders");
     }
     setRefreshing(false);
@@ -1207,6 +1230,8 @@ export default function OrdersScreen() {
           Pending: 0,
           DC: 0,
           Invoice: 0,
+          'Inv Check': 0,
+          'Inv Checked': 0,
           Dispatched: 0
         };
         
@@ -1569,6 +1594,7 @@ export default function OrdersScreen() {
                   name={
                     opt === 'Pending' ? 'time-outline' :
                     opt === 'Invoice' ? 'document-text-outline' :
+                    opt === 'Inv Check' ? 'checkmark-circle-outline' :
                     opt === 'Dispatched' ? 'send-outline' :
                     opt === 'DC' ? 'cube-outline' : 'ellipse-outline'
                   }
@@ -1718,131 +1744,73 @@ export default function OrdersScreen() {
                   </Pressable>
                 </View>
                 
-                {/* Scrollable Content using FlatList */}
+                {/* Content */}
                 {dispatchLoading ? (
                   <View style={dispatchModalStyles.loadingContainer}>
                     <ActivityIndicator size="large" color={ACCENT} />
                     <Text style={dispatchModalStyles.loadingText}>Loading dispatch data...</Text>
                   </View>
-                ) : dispatchData ? (
-                  <FlatList
-                    data={dispatchData.orderItems}
-                    keyExtractor={(item, index) => `dispatch-item-${index}`}
-                    showsVerticalScrollIndicator={true}
-                    contentContainerStyle={dispatchModalStyles.flatListContent}
-                    removeClippedSubviews={false}
-                    style={{ zIndex: 1 }}
-                    ListHeaderComponent={
-                      <>
-                        {/* Invoice Created Checkbox */}
-                        <View style={[dispatchModalStyles.section, { marginTop: 16 }]}>
-                          <Pressable 
-                            style={dispatchModalStyles.checkboxRow}
-                            onPress={() => setInvoiceCreated(!invoiceCreated)}
-                          >
-                            <View style={[
-                              dispatchModalStyles.checkbox,
-                              invoiceCreated && dispatchModalStyles.checkboxSelected
-                            ]}>
-                              {invoiceCreated && <Ionicons name="checkmark" size={16} color="#fff" />}
-                            </View>
-                            <Text style={dispatchModalStyles.checkboxLabel}>Invoice has been created</Text>
-                          </Pressable>
+                ) : (
+                  <View style={[dispatchModalStyles.flatListContent, { flex: 1 }]}>
+                    {/* Invoice Created Checkbox */}
+                    <View style={[dispatchModalStyles.section, { marginTop: 16 }]}>
+                      <Pressable 
+                        style={dispatchModalStyles.checkboxRow}
+                        onPress={() => setInvoiceCreated(!invoiceCreated)}
+                      >
+                        <View style={[
+                          dispatchModalStyles.checkbox,
+                          invoiceCreated && dispatchModalStyles.checkboxSelected
+                        ]}>
+                          {invoiceCreated && <Ionicons name="checkmark" size={16} color="#fff" />}
                         </View>
+                        <Text style={dispatchModalStyles.checkboxLabel}>Invoice has been created</Text>
+                      </Pressable>
+                    </View>
 
-                        {/* Delivery Partner Selection */}
-                        <View style={dispatchModalStyles.section}>
-                          <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
-                          <View 
-                            ref={deliveryPartnerPickerRef}
-                            collapsable={false}
-                          >
-                            <Pressable 
-                              style={dispatchModalStyles.deliveryPartnerPicker} 
-                              onPress={() => {
-                                if (!openDeliveryDropdown && deliveryPartnerPickerRef.current && modalContainerRef.current) {
-                                  deliveryPartnerPickerRef.current.measure((px, py, width, height, pickerPageX, pickerPageY) => {
-                                    modalContainerRef.current?.measure((mx, my, mwidth, mheight, modalPageX, modalPageY) => {
-                                      // Calculate position relative to modal container
-                                      const relativeX = pickerPageX - modalPageX;
-                                      const relativeY = pickerPageY - modalPageY;
-                                      setPickerLayout({ x: relativeX, y: relativeY, width, height });
-                                    });
-                                  });
-                                }
-                                setOpenDeliveryDropdown(!openDeliveryDropdown);
-                              }}
-                            >
-                              <Text style={styles.inputIcon}>🚚</Text>
-                              <Text style={[
-                                dispatchModalStyles.deliveryPartnerPickerText,
-                                !selectedDeliveryPartner && dispatchModalStyles.deliveryPartnerPickerPlaceholder
-                              ]}>
-                                {selectedDeliveryPartner ? 
-                                  staffDropdownItems.find(item => item.value === selectedDeliveryPartner)?.label || 'Select Delivery Partner' :
-                                  'Select Delivery Partner'
-                                }
-                              </Text>
-                              <Ionicons 
-                                name={openDeliveryDropdown ? "chevron-up" : "chevron-down"} 
-                                size={18} 
-                                color={ACCENT} 
-                              />
-                            </Pressable>
-                          </View>
-                        </View>
-
-                        {/* Products Section Header */}
-                        <View style={[dispatchModalStyles.section, { zIndex: 1 }]}>
-                          <Text style={dispatchModalStyles.sectionTitle}>Products to Dispatch</Text>
-                          <Text style={dispatchModalStyles.sectionSubtitle}>
-                            All items will be dispatched
+                    {/* Delivery Partner Selection */}
+                    <View style={dispatchModalStyles.section}>
+                      <Text style={dispatchModalStyles.sectionTitle}>Delivery Partner</Text>
+                      <View 
+                        ref={deliveryPartnerPickerRef}
+                        collapsable={false}
+                      >
+                        <Pressable 
+                          style={dispatchModalStyles.deliveryPartnerPicker} 
+                          onPress={() => {
+                            if (!openDeliveryDropdown && deliveryPartnerPickerRef.current && modalContainerRef.current) {
+                              deliveryPartnerPickerRef.current.measure((px, py, width, height, pickerPageX, pickerPageY) => {
+                                modalContainerRef.current?.measure((mx, my, mwidth, mheight, modalPageX, modalPageY) => {
+                                  // Calculate position relative to modal container
+                                  const relativeX = pickerPageX - modalPageX;
+                                  const relativeY = pickerPageY - modalPageY;
+                                  setPickerLayout({ x: relativeX, y: relativeY, width, height });
+                                });
+                              });
+                            }
+                            setOpenDeliveryDropdown(!openDeliveryDropdown);
+                          }}
+                        >
+                          <Text style={styles.inputIcon}>🚚</Text>
+                          <Text style={[
+                            dispatchModalStyles.deliveryPartnerPickerText,
+                            !selectedDeliveryPartner && dispatchModalStyles.deliveryPartnerPickerPlaceholder
+                          ]}>
+                            {selectedDeliveryPartner ? 
+                              staffDropdownItems.find(item => item.value === selectedDeliveryPartner)?.label || 'Select Delivery Partner' :
+                              'Select Delivery Partner'
+                            }
                           </Text>
-                        </View>
-                      </>
-                    }
-                    renderItem={({ item, index }) => (
-                      <View key={index} style={dispatchModalStyles.productCard}>
-                        <View style={dispatchModalStyles.productCardHeader}>
-                          <Text style={dispatchModalStyles.productName} numberOfLines={2}>{item.name}</Text>
-                          {item.dimension && (
-                            <Text style={dispatchModalStyles.productDimension}>{item.dimension}</Text>
-                          )}
-                        </View>
-                        
-                        <View style={dispatchModalStyles.productDetails}>
-                          <View style={dispatchModalStyles.productDetailRow}>
-                            <Text style={dispatchModalStyles.productLabel}>Quantity:</Text>
-                            <Text style={dispatchModalStyles.productValue}>{item.qty}</Text>
-                          </View>
-                          <View style={dispatchModalStyles.productDetailRow}>
-                            <Text style={dispatchModalStyles.productLabel}>Price:</Text>
-                            <Text style={dispatchModalStyles.productValue}>₹{item.price}</Text>
-                          </View>
-                          <View style={dispatchModalStyles.productDetailRow}>
-                            <Text style={dispatchModalStyles.productLabel}>Available Stock:</Text>
-                            <Text style={[
-                              dispatchModalStyles.productValue,
-                              !item.canFulfill && { color: '#ff5252', fontWeight: '700' }
-                            ]}>
-                              {item.availableStock}
-                              {!item.canFulfill && ' ⚠️'}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {!item.canFulfill && (
-                          <View style={dispatchModalStyles.stockWarningBanner}>
-                            <Ionicons name="warning" size={16} color="#ff5252" />
-                            <Text style={dispatchModalStyles.stockWarningText}>
-                              Insufficient stock! Only {item.availableStock} available.
-                            </Text>
-                          </View>
-                        )}
+                          <Ionicons 
+                            name={openDeliveryDropdown ? "chevron-up" : "chevron-down"} 
+                            size={18} 
+                            color={ACCENT} 
+                          />
+                        </Pressable>
                       </View>
-                    )}
-                  />
-                ) : null}
+                    </View>
+                  </View>
+                )}
 
                 {/* Delivery Partner Dropdown - Rendered outside FlatList for proper z-index */}
                 {openDeliveryDropdown && pickerLayout && (
@@ -2105,7 +2073,8 @@ const dispatchModalStyles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     width: '100%',
-    maxHeight: '100%',
+    minHeight: '70%',
+    maxHeight: '95%',
     flexDirection: 'column',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },

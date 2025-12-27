@@ -9,7 +9,7 @@ import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
-const roleOptions = ["Admin", "Staff", "Executive"];
+const roleOptions = ["Admin", "Staff", "Executive", "Inventory Manager"];
 
 export default function NewStaffScreen() {
   const router = useRouter();
