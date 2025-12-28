@@ -265,39 +265,49 @@ export default function InventoryProductScreen() {
           {/* Bottom Action */}
           {orderStatus === 'Inv Check' && (
             <View style={styles.bottomAction}>
-              {!allSufficient && (
-                <View style={styles.warningBanner}>
-                  <Ionicons name="warning" size={18} color={WARNING} />
-                  <Text style={styles.warningText}>
-                    Some items have insufficient stock. Proceeding will still deduct available quantities.
-                  </Text>
-                </View>
+              {!allSufficient ? (
+                <>
+                  <View style={styles.insufficientBanner}>
+                    <Ionicons name="close-circle" size={22} color={DANGER} />
+                    <View style={styles.insufficientBannerContent}>
+                      <Text style={styles.insufficientTitle}>Cannot Proceed</Text>
+                      <Text style={styles.insufficientText}>
+                        {insufficientItems} item{insufficientItems > 1 ? 's have' : ' has'} insufficient stock. Please update inventory before proceeding.
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.disabledBtnContainer}>
+                    <Ionicons name="lock-closed" size={20} color="#adb5bd" style={{ marginRight: 8 }} />
+                    <Text style={styles.disabledBtnText}>Inventory Check Locked</Text>
+                  </View>
+                </>
+              ) : (
+                <Pressable
+                  style={[
+                    styles.confirmBtn,
+                    styles.confirmBtnSuccess,
+                    updating && styles.confirmBtnDisabled
+                  ]}
+                  onPress={handleInventoryChecked}
+                  disabled={updating}
+                >
+                  {updating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons 
+                        name="checkmark-done-circle" 
+                        size={24} 
+                        color="#fff" 
+                        style={{ marginRight: 10 }} 
+                      />
+                      <Text style={styles.confirmBtnText}>
+                        Confirm & Deduct Stock
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
               )}
-              <Pressable
-                style={[
-                  styles.confirmBtn,
-                  allSufficient ? styles.confirmBtnSuccess : styles.confirmBtnWarning,
-                  updating && styles.confirmBtnDisabled
-                ]}
-                onPress={handleInventoryChecked}
-                disabled={updating}
-              >
-                {updating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons 
-                      name={allSufficient ? "checkmark-done-circle" : "alert-circle"} 
-                      size={24} 
-                      color="#fff" 
-                      style={{ marginRight: 10 }} 
-                    />
-                    <Text style={styles.confirmBtnText}>
-                      {allSufficient ? 'Confirm & Deduct Stock' : 'Proceed Anyway'}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
             </View>
           )}
         </>
@@ -508,20 +518,45 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
   },
-  warningBanner: {
+  insufficientBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: WARNING + '15',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: DANGER + '12',
+    padding: 14,
+    borderRadius: 10,
     marginBottom: 12,
-    gap: 10,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: DANGER + '30',
   },
-  warningText: {
+  insufficientBannerContent: {
     flex: 1,
-    fontSize: 12,
-    color: '#856404',
+  },
+  insufficientTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: DANGER,
+    marginBottom: 4,
+  },
+  insufficientText: {
+    fontSize: 13,
+    color: '#721c24',
     lineHeight: 18,
+  },
+  disabledBtnContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    backgroundColor: '#e9ecef',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  disabledBtnText: {
+    color: '#6c757d',
+    fontWeight: '600',
+    fontSize: 15,
   },
   confirmBtn: {
     flexDirection: 'row',
@@ -532,9 +567,6 @@ const styles = StyleSheet.create({
   },
   confirmBtnSuccess: {
     backgroundColor: SUCCESS,
-  },
-  confirmBtnWarning: {
-    backgroundColor: WARNING,
   },
   confirmBtnDisabled: {
     backgroundColor: '#adb5bd',

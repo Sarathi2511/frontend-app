@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert, Image } from "react-native";
 import { useEffect, useState } from "react";
 import { getOrders } from "../utils/api";
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,116 @@ import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
+
+// Status timeline component
+function StatusTimeline({ currentStatus, statusHistory }: { currentStatus: string; statusHistory: any[] }) {
+  const statusFlow = ['Pending', 'DC', 'Invoice', 'Inv Check', 'Inv Checked', 'Dispatched'];
+  const statusIcons: { [key: string]: string } = {
+    'Pending': '⏳',
+    'DC': '📝',
+    'Invoice': '🧾',
+    'Inv Check': '✅',
+    'Inv Checked': '✓',
+    'Dispatched': '🚚'
+  };
+  const statusColors: { [key: string]: string } = {
+    'Pending': '#b8860b',
+    'DC': '#3D5AFE',
+    'Invoice': '#388e3c',
+    'Inv Check': '#FF6F00',
+    'Inv Checked': '#FF6F00',
+    'Dispatched': '#43a047'
+  };
+
+  const currentIndex = statusFlow.indexOf(currentStatus);
+  
+  // Create a map of status to history entry (get the latest entry for each status)
+  const statusHistoryMap = new Map<string, any>();
+  if (statusHistory && Array.isArray(statusHistory)) {
+    statusHistory.forEach((entry: any) => {
+      const existing = statusHistoryMap.get(entry.status);
+      if (!existing || new Date(entry.updatedAt) > new Date(existing.updatedAt)) {
+        statusHistoryMap.set(entry.status, entry);
+      }
+    });
+  }
+  
+  const formatDate = (date: Date | string | null) => {
+    if (!date) return 'N/A';
+    try {
+      const d = typeof date === 'string' ? new Date(date) : date;
+      return d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch {
+      return 'N/A';
+    }
+  };
+
+  return (
+    <View style={styles.timelineContainer}>
+      {statusFlow.map((status, index) => {
+        const isCompleted = index <= currentIndex;
+        const isCurrent = status === currentStatus;
+        const historyEntry = statusHistoryMap.get(status);
+
+        return (
+          <View key={status} style={styles.timelineItem}>
+            <View style={styles.timelineLeft}>
+              <View style={[
+                styles.timelineIcon,
+                isCompleted && styles.timelineIconCompleted,
+                isCurrent && styles.timelineIconCurrent,
+                { backgroundColor: isCompleted ? (statusColors[status] || ACCENT) + '20' : '#f0f0f0' }
+              ]}>
+                <Text style={styles.timelineIconText}>{statusIcons[status] || '○'}</Text>
+              </View>
+              {index < statusFlow.length - 1 && (
+                <View style={[
+                  styles.timelineLine,
+                  isCompleted && styles.timelineLineCompleted
+                ]} />
+              )}
+            </View>
+            <View style={styles.timelineRight}>
+              <View style={styles.timelineContent}>
+                <View style={styles.timelineHeader}>
+                  <Text style={[
+                    styles.timelineStatusText,
+                    isCompleted && styles.timelineStatusTextCompleted,
+                    isCurrent && styles.timelineStatusTextCurrent
+                  ]}>
+                    {status}
+                  </Text>
+                  {isCurrent && (
+                    <View style={styles.currentBadge}>
+                      <Text style={styles.currentBadgeText}>Current</Text>
+                    </View>
+                  )}
+                </View>
+                {historyEntry && (
+                  <View style={styles.timelineDetails}>
+                    {historyEntry.updatedAt && (
+                      <Text style={styles.timelineDetailText}>
+                        {formatDate(historyEntry.updatedAt)}
+                        {historyEntry.updatedBy && typeof historyEntry.updatedBy === 'object' && historyEntry.updatedBy.name 
+                          ? ` • ${historyEntry.updatedBy.name}` 
+                          : ''}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function OrderDetailsScreen() {
   const { id } = useLocalSearchParams();
@@ -105,6 +215,12 @@ export default function OrderDetailsScreen() {
                 bg={order.paymentCondition === 'Immediate' ? '#e8f5e9' : '#e3e9f9'}
               />
             </View>
+          </View>
+
+          {/* Status Timeline */}
+          <View style={styles.sectionCard}>
+            {sectionHeader('📋', 'Status Timeline')}
+            <StatusTimeline currentStatus={order.orderStatus} statusHistory={order.statusHistory || []} />
           </View>
 
           {/* Delivery Details */}
@@ -454,5 +570,96 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: ACCENT,
     letterSpacing: 0.5,
+  },
+  timelineContainer: {
+    marginTop: 4,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  timelineLeft: {
+    alignItems: 'center',
+    marginRight: 12,
+    width: 32,
+  },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#e0e0e0',
+  },
+  timelineIconCompleted: {
+    borderColor: ACCENT,
+  },
+  timelineIconCurrent: {
+    borderWidth: 3,
+    borderColor: ACCENT,
+    elevation: 2,
+    shadowColor: ACCENT,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  timelineIconText: {
+    fontSize: 14,
+  },
+  timelineLine: {
+    width: 2,
+    flex: 1,
+    backgroundColor: '#e0e0e0',
+    marginTop: 2,
+    minHeight: 12,
+  },
+  timelineLineCompleted: {
+    backgroundColor: ACCENT,
+  },
+  timelineRight: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  timelineStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9e9e9e',
+    marginRight: 8,
+  },
+  timelineStatusTextCompleted: {
+    color: '#424242',
+  },
+  timelineStatusTextCurrent: {
+    color: ACCENT,
+    fontWeight: '700',
+  },
+  currentBadge: {
+    backgroundColor: ACCENT + '20',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  currentBadgeText: {
+    color: ACCENT,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  timelineDetails: {
+    marginTop: 2,
+  },
+  timelineDetailText: {
+    fontSize: 11,
+    color: '#6B7280',
+    lineHeight: 16,
   },
 }); 
