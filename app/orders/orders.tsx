@@ -13,17 +13,14 @@ import { useToast } from "../contexts/ToastContext";
 
 const ACCENT = "#3D5AFE";
 
-const statusOptions = ["Pending", "DC", "Invoice", "Inv Check", "Inv Checked", "Dispatched"];
+const statusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
 
 // Define valid status transitions for flexible workflow
-// Note: 'Inv Check' -> 'Inv Checked' is controlled by Inventory Manager only
 const getValidNextStatuses = (currentStatus: string): string[] => {
   const validTransitions = {
     'Pending': ['DC'],
-    'DC': ['Invoice'], // Only Invoice allowed from DC
-    'Invoice': ['Inv Check'],
-    'Inv Check': [], // No transitions for regular users - only Inventory Manager can progress this
-    'Inv Checked': ['Dispatched'],
+    'DC': ['Invoice'],
+    'Invoice': ['Dispatched'],
     'Dispatched': [] // Final state, no further transitions
   };
   return validTransitions[currentStatus as keyof typeof validTransitions] || [];
@@ -211,14 +208,6 @@ const styles = StyleSheet.create({
   statusInvoice: {
     backgroundColor: '#e8f5e9',
     color: '#388e3c',
-  },
-  statusInvCheck: {
-    backgroundColor: '#fff3e0',
-    color: '#f57c00',
-  },
-  statusInvChecked: {
-    backgroundColor: '#e0f7fa',
-    color: '#00838f',
   },
   statusDispatched: {
     backgroundColor: '#f3e5f5',
@@ -826,8 +815,6 @@ function getStatusStyle(status: string) {
     case 'Pending': return styles.statusPending;
     case 'DC': return styles.statusDC;
     case 'Invoice': return styles.statusInvoice;
-    case 'Inv Check': return styles.statusInvCheck;
-    case 'Inv Checked': return styles.statusInvChecked;
     case 'Dispatched': return styles.statusDispatched;
     default: return {};
   }
@@ -871,16 +858,19 @@ const OrderCard = memo(({
       {/* Line 1: Order ID and Three Dots */}
       <View style={styles.cardRowTop}>
         <Text style={styles.orderId}>{item.orderId}</Text>
-        <Pressable 
-          style={[styles.menuIconBtn, isExpanded && styles.menuIconBtnActive]} 
-          onPress={onMenuPress}
-        >
-          <Ionicons 
-            name={isExpanded ? "chevron-up" : "ellipsis-vertical"} 
-            size={20} 
-            color={isExpanded ? "#3D5AFE" : "#b0b3b8"} 
-          />
-        </Pressable>
+        {/* Hide menu button for Inventory Manager - they can only view orders */}
+        {userRole !== 'Inventory Manager' && (
+          <Pressable 
+            style={[styles.menuIconBtn, isExpanded && styles.menuIconBtnActive]} 
+            onPress={onMenuPress}
+          >
+            <Ionicons 
+              name={isExpanded ? "chevron-up" : "ellipsis-vertical"} 
+              size={20} 
+              color={isExpanded ? "#3D5AFE" : "#b0b3b8"} 
+            />
+          </Pressable>
+        )}
       </View>
       
       {/* Line 2: Customer Name and Order Status */}
@@ -891,16 +881,12 @@ const OrderCard = memo(({
                     name={
                       item.orderStatus === 'Pending' ? 'time-outline' :
                       item.orderStatus === 'Invoice' ? 'document-text-outline' :
-                      item.orderStatus === 'Inv Check' ? 'checkmark-circle-outline' :
-                      item.orderStatus === 'Inv Checked' ? 'checkmark-done-circle-outline' :
                       item.orderStatus === 'Dispatched' ? 'send-outline' :
                       item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
                     }
             size={14}
                     color={item.orderStatus === 'Pending' ? '#b8860b' :
                    item.orderStatus === 'Invoice' ? '#388e3c' :
-                   item.orderStatus === 'Inv Check' ? '#f57c00' :
-                   item.orderStatus === 'Inv Checked' ? '#00838f' :
                    item.orderStatus === 'Dispatched' ? '#8e24aa' :
                    item.orderStatus === 'DC' ? '#1976d2' : '#222'}
             style={{ marginRight: 4 }}
@@ -958,8 +944,6 @@ const OrderCard = memo(({
                       status === 'Pending' ? 'time-outline' :
                       status === 'DC' ? 'cube-outline' :
                       status === 'Invoice' ? 'document-text-outline' :
-                      status === 'Inv Check' ? 'checkmark-circle-outline' :
-                      status === 'Inv Checked' ? 'checkmark-done-circle-outline' :
                       status === 'Dispatched' ? 'send-outline' : 'ellipse-outline'
                     }
                     size={20}
@@ -1046,8 +1030,6 @@ export default function OrdersScreen() {
     Pending: 0,
     DC: 0,
     Invoice: 0,
-    'Inv Check': 0,
-    'Inv Checked': 0,
     Dispatched: 0
   });
   
@@ -1107,8 +1089,6 @@ export default function OrdersScreen() {
         Pending: 0,
         DC: 0,
         Invoice: 0,
-        'Inv Check': 0,
-        'Inv Checked': 0,
         Dispatched: 0
       };
       
@@ -1122,7 +1102,7 @@ export default function OrdersScreen() {
     } catch (err) {
       setOrders([]);
       setFilteredOrders([]);
-      setOrderCounts({ Pending: 0, DC: 0, Invoice: 0, 'Inv Check': 0, 'Inv Checked': 0, Dispatched: 0 });
+      setOrderCounts({ Pending: 0, DC: 0, Invoice: 0, Dispatched: 0 });
       Alert.alert("Error", "Failed to fetch orders");
     }
     setRefreshing(false);
@@ -1230,8 +1210,6 @@ export default function OrdersScreen() {
           Pending: 0,
           DC: 0,
           Invoice: 0,
-          'Inv Check': 0,
-          'Inv Checked': 0,
           Dispatched: 0
         };
         
@@ -1594,7 +1572,6 @@ export default function OrdersScreen() {
                   name={
                     opt === 'Pending' ? 'time-outline' :
                     opt === 'Invoice' ? 'document-text-outline' :
-                    opt === 'Inv Check' ? 'checkmark-circle-outline' :
                     opt === 'Dispatched' ? 'send-outline' :
                     opt === 'DC' ? 'cube-outline' : 'ellipse-outline'
                   }

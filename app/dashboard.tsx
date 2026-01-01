@@ -16,7 +16,7 @@ const modules = [
     icon: "📦",
     color: "#3D5AFE",
     description: "View and create shop orders.",
-    roles: ["Admin", "Staff", "Executive"]
+    roles: ["Admin", "Staff", "Executive", "Inventory Manager"]
   },
   {
     key: "inventory",
@@ -24,7 +24,7 @@ const modules = [
     icon: "💡",
     color: "#00C853",
     description: "Check and update stock levels.",
-    roles: ["Admin"]  // Admin only
+    roles: ["Admin", "Inventory Manager"]
   },
   {
     key: "staff",
@@ -129,117 +129,6 @@ export default function DashboardScreen() {
     );
   };
   
-  // Show modules for Inventory Manager
-  if (userRole === 'Inventory Manager') {
-    const inventoryModules = [
-      {
-        key: "inventory-check",
-        title: "Inventory Check",
-        icon: "✅",
-        color: "#FF6F00",
-        description: "Review orders ready for inventory check."
-      },
-      {
-        key: "inventory",
-        title: "Inventory",
-        icon: "💡",
-        color: "#00C853",
-        description: "Check and update stock levels."
-      }
-    ];
-
-    return (
-      <View style={{ flex: 1 }}>
-        <LinearGradient
-          colors={["#e3e9f9", "#f5f7fa", "#f8fafc"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.bg}>
-          {/* Modern Header Card */}
-          <LinearGradient
-            colors={["#e3e9f9", "#f5f7fa"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.headerCard}
-          >
-            <View style={styles.headerRow}>
-              {/* Profile Circle */}
-              <View style={styles.profileCircle}>
-                <Text style={styles.profileInitials}>{initials}</Text>
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={styles.greetingText}>{greeting},</Text>
-                <Text style={styles.greetingName}>{firstName} <Text style={{ fontSize: 20 }}>👋</Text></Text>
-                <Text style={styles.userRole}>{userRole}</Text>
-              </View>
-              <View style={styles.headerActions}>
-                <Pressable 
-                  style={({ pressed }) => [
-                    styles.logoutButton,
-                    pressed && { opacity: 0.7 }
-                  ]} 
-                  onPress={handleLogout}
-                >
-                  <Ionicons name="log-out-outline" size={24} color={ACCENT} />
-                </Pressable>
-              </View>
-            </View>
-          </LinearGradient>
-          
-          {/* Modules Grid */}
-          <View style={styles.modulesWrap}>
-            {inventoryModules.map((mod) => {
-              const isPressed = pressedCard === mod.key;
-              return (
-                <RNAnimated.View
-                  key={mod.key}
-                  style={{
-                    transform: [
-                      { scale: isPressed ? 0.97 : 1 }
-                    ],
-                    shadowColor: mod.color,
-                    shadowOffset: { width: 0, height: isPressed ? 12 : 8 },
-                    shadowOpacity: isPressed ? 0.18 : 0.10,
-                    shadowRadius: isPressed ? 18 : 10,
-                    elevation: isPressed ? 12 : 6,
-                    marginBottom: 18,
-                    borderRadius: 16,
-                  }}
-                >
-                  <Pressable
-                    style={[styles.moduleCard, { borderColor: mod.color + '33', borderWidth: 1 }]}
-                    onPressIn={() => setPressedCard(mod.key)}
-                    onPressOut={() => setPressedCard(null)}
-                    onPress={() => {
-                      if (mod.key === 'inventory-check') {
-                        router.push({ pathname: './inventory-manager/inventory-check', params: { role, name } });
-                      } else if (mod.key === 'inventory') {
-                        router.push({ pathname: './products', params: { role } });
-                      }
-                    }}
-                  >
-                    <View style={[styles.iconCircle, { backgroundColor: mod.color + '22' }]}> 
-                      <Text style={{ fontSize: 28 }}>{mod.icon}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.moduleTitle}>{mod.title}</Text>
-                      <Text style={styles.moduleDesc}>{mod.description}</Text>
-                    </View>
-                    <View style={styles.ctaArrowWrap}>
-                      <Ionicons name="chevron-forward" size={22} color={mod.color} />
-                    </View>
-                  </Pressable>
-                </RNAnimated.View>
-              );
-            })}
-          </View>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={{ flex: 1 }}>
       {/* Soft Gradient Background */}
@@ -299,52 +188,54 @@ export default function DashboardScreen() {
         </View>
         {/* Dashboard Modules */}
         <View style={styles.modulesWrap}>
-          {/* My Orders Card */}
-          <RNAnimated.View
-            style={{
-              transform: [ { scale: pressedCard === 'my-orders' ? 0.97 : 1 } ],
-              shadowColor: ACCENT,
-              shadowOffset: { width: 0, height: pressedCard === 'my-orders' ? 12 : 8 },
-              shadowOpacity: pressedCard === 'my-orders' ? 0.18 : 0.10,
-              shadowRadius: pressedCard === 'my-orders' ? 18 : 10,
-              elevation: pressedCard === 'my-orders' ? 12 : 6,
-              marginBottom: 18,
-              borderRadius: 16,
-            }}
-          >
-            <Pressable
-              style={[styles.moduleCard, { borderColor: ACCENT + '33', borderWidth: 1 }]}
-              onPressIn={() => setPressedCard('my-orders')}
-              onPressOut={() => setPressedCard(null)}
-              onPress={() => router.push({ pathname: './orders/my-orders', params: { role, name } })}
+          {/* My Orders Card - Hide for Inventory Manager */}
+          {userRole !== 'Inventory Manager' && (
+            <RNAnimated.View
+              style={{
+                transform: [ { scale: pressedCard === 'my-orders' ? 0.97 : 1 } ],
+                shadowColor: ACCENT,
+                shadowOffset: { width: 0, height: pressedCard === 'my-orders' ? 12 : 8 },
+                shadowOpacity: pressedCard === 'my-orders' ? 0.18 : 0.10,
+                shadowRadius: pressedCard === 'my-orders' ? 18 : 10,
+                elevation: pressedCard === 'my-orders' ? 12 : 6,
+                marginBottom: 18,
+                borderRadius: 16,
+              }}
             >
-              <View style={[styles.iconCircle, { backgroundColor: ACCENT + '22', position: 'relative' }]}> 
-                <Text style={{ fontSize: 28 }}>🗂️</Text>
-                <View style={{
-                  position: 'absolute',
-                  top: -6,
-                  right: -6,
-                  backgroundColor: '#ff5252',
-                  borderRadius: 10,
-                  minWidth: 20,
-                  height: 20,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingHorizontal: 6,
-                  zIndex: 2,
-                }}>
-                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{myOrdersCount}</Text>
+              <Pressable
+                style={[styles.moduleCard, { borderColor: ACCENT + '33', borderWidth: 1 }]}
+                onPressIn={() => setPressedCard('my-orders')}
+                onPressOut={() => setPressedCard(null)}
+                onPress={() => router.push({ pathname: './orders/my-orders', params: { role, name } })}
+              >
+                <View style={[styles.iconCircle, { backgroundColor: ACCENT + '22', position: 'relative' }]}> 
+                  <Text style={{ fontSize: 28 }}>🗂️</Text>
+                  <View style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#ff5252',
+                    borderRadius: 10,
+                    minWidth: 20,
+                    height: 20,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 6,
+                    zIndex: 2,
+                  }}>
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{myOrdersCount}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.moduleTitle}>My Orders</Text>
-                <Text style={styles.moduleDesc}>View orders assigned to you</Text>
-              </View>
-              <View style={styles.ctaArrowWrap}>
-                <Ionicons name="chevron-forward" size={22} color={ACCENT} />
-              </View>
-            </Pressable>
-          </RNAnimated.View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.moduleTitle}>My Orders</Text>
+                  <Text style={styles.moduleDesc}>View orders assigned to you</Text>
+                </View>
+                <View style={styles.ctaArrowWrap}>
+                  <Ionicons name="chevron-forward" size={22} color={ACCENT} />
+                </View>
+              </Pressable>
+            </RNAnimated.View>
+          )}
           {/* Render the rest of the modules */}
           {allowedModules.map((mod) => {
             const isPressed = pressedCard === mod.key;
@@ -396,20 +287,27 @@ export default function DashboardScreen() {
           <TouchableWithoutFeedback onPress={() => setShowQuickActions(false)}>
             <View style={styles.quickActionsOverlay}>
               <View style={styles.quickActionsContainer}>
-                <Pressable 
-                  style={styles.quickActionButton}
-                  onPress={() => handleQuickAction('order')}
-                >
-                  <Text style={styles.quickActionIcon}>📝</Text>
-                  <Text style={styles.quickActionLabel}>Orders</Text>
-                </Pressable>
-                <Pressable 
-                  style={styles.quickActionButton}
-                  onPress={() => handleQuickAction('product')}
-                >
-                  <Text style={styles.quickActionIcon}>📦</Text>
-                  <Text style={styles.quickActionLabel}>Products</Text>
-                </Pressable>
+                {/* Orders - Hide for Inventory Manager */}
+                {userRole !== 'Inventory Manager' && (
+                  <Pressable 
+                    style={styles.quickActionButton}
+                    onPress={() => handleQuickAction('order')}
+                  >
+                    <Text style={styles.quickActionIcon}>📝</Text>
+                    <Text style={styles.quickActionLabel}>Orders</Text>
+                  </Pressable>
+                )}
+                {/* Products - Available for Admin and Inventory Manager only (not Staff or Executive) */}
+                {(userRole === 'Admin' || userRole === 'Inventory Manager') && (
+                  <Pressable 
+                    style={styles.quickActionButton}
+                    onPress={() => handleQuickAction('product')}
+                  >
+                    <Text style={styles.quickActionIcon}>📦</Text>
+                    <Text style={styles.quickActionLabel}>Products</Text>
+                  </Pressable>
+                )}
+                {/* Staff - Admin only */}
                 {userRole === 'Admin' && (
                   <Pressable 
                     style={styles.quickActionButton}

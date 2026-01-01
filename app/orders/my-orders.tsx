@@ -13,8 +13,6 @@ function getStatusStyle(status: string) {
     case 'Pending': return styles.statusPending;
     case 'DC': return styles.statusDC;
     case 'Invoice': return styles.statusInvoice;
-    case 'Inv Check': return styles.statusInvCheck;
-    case 'Inv Checked': return styles.statusInvChecked;
     case 'Dispatched': return styles.statusDispatched;
     default: return {};
   }
@@ -49,16 +47,12 @@ const OrderCard = memo(({
             name={
               item.orderStatus === 'Pending' ? 'time-outline' :
               item.orderStatus === 'Invoice' ? 'document-text-outline' :
-              item.orderStatus === 'Inv Check' ? 'checkmark-circle-outline' :
-              item.orderStatus === 'Inv Checked' ? 'checkmark-done-circle-outline' :
               item.orderStatus === 'Dispatched' ? 'send-outline' :
               item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
             }
             size={14}
             color={item.orderStatus === 'Pending' ? '#b8860b' :
                    item.orderStatus === 'Invoice' ? '#388e3c' :
-                   item.orderStatus === 'Inv Check' ? '#f57c00' :
-                   item.orderStatus === 'Inv Checked' ? '#00838f' :
                    item.orderStatus === 'Dispatched' ? '#8e24aa' :
                    item.orderStatus === 'DC' ? '#1976d2' : '#222'}
             style={{ marginRight: 4 }}
@@ -413,14 +407,6 @@ const styles = StyleSheet.create({
   statusInvoice: {
     backgroundColor: '#d4edda',
     borderColor: '#c3e6cb',
-  },
-  statusInvCheck: {
-    backgroundColor: '#fff3e0',
-    borderColor: '#ffe0b2',
-  },
-  statusInvChecked: {
-    backgroundColor: '#e0f7fa',
-    borderColor: '#b2ebf2',
   },
   statusDispatched: {
     backgroundColor: '#e1bee7',

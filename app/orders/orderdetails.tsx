@@ -11,21 +11,17 @@ const ACCENT = "#3D5AFE";
 
 // Status timeline component
 function StatusTimeline({ currentStatus, statusHistory }: { currentStatus: string; statusHistory: any[] }) {
-  const statusFlow = ['Pending', 'DC', 'Invoice', 'Inv Check', 'Inv Checked', 'Dispatched'];
+  const statusFlow = ['Pending', 'DC', 'Invoice', 'Dispatched'];
   const statusIcons: { [key: string]: string } = {
     'Pending': '⏳',
     'DC': '📝',
     'Invoice': '🧾',
-    'Inv Check': '✅',
-    'Inv Checked': '✓',
     'Dispatched': '🚚'
   };
   const statusColors: { [key: string]: string } = {
     'Pending': '#b8860b',
     'DC': '#3D5AFE',
     'Invoice': '#388e3c',
-    'Inv Check': '#FF6F00',
-    'Inv Checked': '#FF6F00',
     'Dispatched': '#43a047'
   };
 
