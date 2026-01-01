@@ -1,10 +1,11 @@
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useEffect, useState, useCallback, memo } from "react";
+import { useEffect, useState, memo } from "react";
 import { FlatList, Platform, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Alert } from "react-native";
 import { getOrdersAssignedTo, getCurrentUserId } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useSocket } from "../contexts/SocketContext";
 import { androidUI } from "../utils/androidUI";
+import OrdersHeader from "./components/OrdersHeader";
 
 const ACCENT = "#3D5AFE";
 
@@ -42,23 +43,33 @@ const OrderCard = memo(({
       {/* Line 2: Customer Name and Order Status */}
       <View style={styles.cardRowMid}>
         <Text style={styles.customerName} numberOfLines={2}>{item.customerName}</Text>
-        <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
-          <Ionicons
-            name={
-              item.orderStatus === 'Pending' ? 'time-outline' :
-              item.orderStatus === 'Invoice' ? 'document-text-outline' :
-              item.orderStatus === 'Dispatched' ? 'send-outline' :
-              item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
-            }
-            size={14}
-            color={item.orderStatus === 'Pending' ? '#b8860b' :
-                   item.orderStatus === 'Invoice' ? '#388e3c' :
-                   item.orderStatus === 'Dispatched' ? '#8e24aa' :
-                   item.orderStatus === 'DC' ? '#1976d2' : '#222'}
-            style={{ marginRight: 4 }}
-          />
-          <Text style={styles.statusChipText}>{item.orderStatus}</Text>
-        </View>
+        {/* Show "Partially Dispatched" badge for dispatched orders with partial delivery */}
+        {item.orderStatus === 'Dispatched' && item.isPartialDelivery ? (
+          <View style={[styles.statusChip, styles.statusPartiallyDispatched]}>
+            <Ionicons name="alert-circle-outline" size={14} color="#e65100" style={{ marginRight: 4 }} />
+            <Text style={[styles.statusChipText, { color: '#e65100' }]}>Partially Dispatched</Text>
+          </View>
+        ) : (
+          <View style={[styles.statusChip, getStatusStyle(item.orderStatus)]}>
+            <Ionicons
+              name={
+                item.orderStatus === 'Pending' ? 'time-outline' :
+                item.orderStatus === 'Invoice' ? 'document-text-outline' :
+                item.orderStatus === 'Dispatched' ? 'send-outline' :
+                item.orderStatus === 'DC' ? 'cube-outline' : 'ellipse-outline'
+              }
+              size={14}
+              color={
+                item.orderStatus === 'Pending' ? '#b8860b' :
+                item.orderStatus === 'Invoice' ? '#388e3c' :
+                item.orderStatus === 'Dispatched' ? '#8e24aa' :
+                item.orderStatus === 'DC' ? '#1976d2' : '#222'
+              }
+              style={{ marginRight: 4 }}
+            />
+            <Text style={styles.statusChipText}>{item.orderStatus}</Text>
+          </View>
+        )}
       </View>
       
       {/* Line 3: Order Route */}
@@ -97,8 +108,6 @@ const OrderCard = memo(({
 
 export default function MyOrdersScreen() {
   const router = useRouter();
-  const { role } = useLocalSearchParams();
-  const userRole = role ? String(role) : "User";
   const [orders, setOrders] = useState<any[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,13 +231,7 @@ export default function MyOrdersScreen() {
 
   return (
     <View style={styles.screenWrap}>
-      {/* Header */}
-      <View style={styles.headerBar}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={ACCENT} />
-        </Pressable>
-        <Text style={styles.headerTitle}>My Orders</Text>
-      </View>
+      <OrdersHeader title="My Orders" />
       {loading ? (
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color={ACCENT} />
@@ -286,32 +289,6 @@ const styles = StyleSheet.create({
   screenWrap: {
     flex: 1,
     backgroundColor: '#f5f7fa',
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: androidUI.colors.surface,
-    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
-    paddingBottom: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: androidUI.colors.border,
-    elevation: 4,
-    zIndex: 10,
-    minHeight: 68,
-  },
-  backBtn: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.sm,
-    marginRight: androidUI.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
   },
   filterBar: {
     backgroundColor: androidUI.colors.surface,
@@ -411,6 +388,10 @@ const styles = StyleSheet.create({
   statusDispatched: {
     backgroundColor: '#e1bee7',
     borderColor: '#d1c4e9',
+  },
+  statusPartiallyDispatched: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#ffe0b2',
   },
   orderCardTotal: {
     fontSize: 15,

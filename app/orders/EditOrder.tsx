@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState, useCallback, useMemo, memo } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, TouchableOpacity, ActivityIndicator, Animated } from "react-native";
-import { getOrders, updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes } from "../utils/api";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Alert, FlatList, Modal, ActivityIndicator, Animated } from "react-native";
+import { updateOrder, getProducts, getStaff, getOrderByOrderId, getOrderRoutes } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
+import OrdersHeader from "./components/OrdersHeader";
 
 const ACCENT = "#3D5AFE";
 const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
@@ -490,13 +491,7 @@ export default function EditOrderScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={styles.screenWrap}>
-        {/* Modern Nav Bar */}
-        <View style={styles.headerBar}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={ACCENT} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Edit Order</Text>
-        </View>
+        <OrdersHeader title="Edit Order" />
         <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
           {/* Sticky Subheading */}
           <View style={styles.stickySubheadingWrap}>
@@ -1000,32 +995,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: androidUI.colors.background,
   },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: androidUI.colors.surface,
-    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
-    paddingBottom: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: androidUI.colors.border,
-    elevation: 4,
-    zIndex: 10,
-    minHeight: 68,
-  },
-  backBtn: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.sm,
-    marginRight: androidUI.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
-  },
   stickySubheadingWrap: {
     backgroundColor: androidUI.colors.surface,
     paddingTop: androidUI.spacing.sm,
@@ -1078,18 +1047,6 @@ const styles = StyleSheet.create({
     fontFamily: androidUI.fontFamily.regular,
     minHeight: 44,
   },
-  disabledInput: {
-    width: '100%',
-    borderWidth: 1,
-    borderColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.medium,
-    padding: androidUI.spacing.lg,
-    fontSize: 16,
-    backgroundColor: '#f3f6fa',
-    color: androidUI.colors.text.disabled,
-    fontStyle: 'italic',
-    marginBottom: 0,
-  },
   dropdownPicker: {
     width: '100%',
     borderWidth: 1,
@@ -1106,41 +1063,6 @@ const styles = StyleSheet.create({
   dropdownPickerText: {
     color: androidUI.colors.text.primary,
     fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  pickerModalSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    padding: androidUI.spacing.xl,
-    maxHeight: '50%',
-    ...androidUI.modalShadow,
-  },
-  pickerOption: {
-    paddingVertical: androidUI.spacing.md,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderRadius: androidUI.borderRadius.small,
-    marginBottom: androidUI.spacing.sm,
-  },
-  pickerOptionSelected: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
-    borderWidth: 1,
-  },
-  pickerOptionText: {
-    color: androidUI.colors.text.primary,
-    fontSize: 16,
-    fontFamily: androidUI.fontFamily.regular,
-  },
-  pickerOptionTextSelected: {
-    color: '#fff',
   },
   segmentedToggleRow: {
     flexDirection: 'row',

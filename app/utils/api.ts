@@ -198,8 +198,19 @@ export const getCustomerByName = (name: string) => api.get(`/customers/by-name/$
 export const getDispatchConfirmation = (orderId: string) => 
   api.get(`/orders/dispatch-confirmation/${orderId}`);
 
-export const dispatchOrder = (orderId: string, data: any) => 
-  api.put(`/orders/by-order-id/${orderId}`, data);
+// Dispatch order with partial delivery support
+// data: { deliveryPartner: string, deliveredItems: Array<{ productId: string, deliveredQty: number, isDelivered: boolean }> }
+export const dispatchOrder = (orderId: string, data: {
+  deliveryPartner: string;
+  deliveredItems: Array<{
+    productId: string;
+    deliveredQty: number;
+    isDelivered: boolean;
+  }>;
+}) => api.post(`/orders/dispatch/${orderId}`, data);
+
+// Complete order - deduct remaining stock for partially dispatched orders
+export const completeOrder = (orderId: string) => api.post(`/orders/complete/${orderId}`);
 
 // Token validation (lightweight check used on app start/resume)
 export const validateToken = async () => {

@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { createOrder, getProducts, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../utils/api";
+import { ActivityIndicator, Alert, Animated, KeyboardAvoidingView, Modal, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { createOrder, getStaff, getCustomerNames, getOrderRoutes, getCustomerByName } from "../utils/api";
 import { useOrder } from "./OrderContext";
-import { useToast } from "../contexts/ToastContext";
 import { androidUI } from "../utils/androidUI";
+import OrdersHeader from "./components/OrdersHeader";
 
 const ACCENT = "#3D5AFE";
 const orderStatusOptions = ["Pending", "DC", "Invoice", "Dispatched"];
@@ -25,7 +25,6 @@ interface OrderItem {
 export default function NewOrderScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
-  const { showToast } = useToast();
   const [form, setForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -45,16 +44,6 @@ export default function NewOrderScreen() {
 
   // Order Items State
   const { orderItems, setAllOrderItems, clearOrderItems } = useOrder();
-  const [productSearch, setProductSearch] = useState("");
-  const [productResults, setProductResults] = useState<any[]>([]);
-  const [productLoading, setProductLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
-  const [qty, setQty] = useState("");
-  const [price, setPrice] = useState("");
-  const [showProductSearch, setShowProductSearch] = useState(false);
-  
-  // Add a flag to track if we are returning from new-product
-  const [reopenProductModal, setReopenProductModal] = useState(false);
 
   // Add new state for edit modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -124,38 +113,6 @@ export default function NewOrderScreen() {
   const handleChange = (field: string, value: any) => {
     setForm({ ...form, [field]: value });
   };
-
-
-  // Fetch products for search
-  const fetchAndSetProducts = async (search: string) => {
-    setProductLoading(true);
-    try {
-      const response = await getProducts();
-      let products = response.data;
-      if (search.trim()) {
-        products = products.filter((p: any) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          (p.dimension && p.dimension.toLowerCase().includes(search.toLowerCase()))
-        );
-      }
-      setProductResults(products);
-    } catch (err) {
-      setProductResults([]);
-      Alert.alert("Error", "Failed to fetch products");
-    }
-    setProductLoading(false);
-  };
-
-  // Handle product search
-  const handleProductSearch = (text: string) => {
-    setProductSearch(text);
-    fetchAndSetProducts(text);
-  };
-
-  // Remove local add/remove product logic; all orderItems come from context
-
-  // Total order amount
-  const orderTotal = orderItems.reduce((sum: number, item: any) => sum + item.total, 0);
 
   // Fetch staff list
   useEffect(() => {
@@ -319,14 +276,6 @@ export default function NewOrderScreen() {
     setCreating(false);
   };
 
-  // When returning from new-product, reopen modal and focus search
-  useEffect(() => {
-    if (reopenProductModal) {
-      setShowProductSearch(true);
-      setReopenProductModal(false);
-    }
-  }, [reopenProductModal]);
-
   // Clear order items when this screen is first opened
   useEffect(() => {
     clearOrderItems();
@@ -387,7 +336,7 @@ export default function NewOrderScreen() {
           text: "Delete", 
           style: "destructive",
           onPress: () => {
-            const newItems = orderItems.filter((_: OrderItem, i: number) => i !== index);
+            const newItems = orderItems.filter((_: any, i: number) => i !== index);
             setAllOrderItems(newItems);
           }
         }
@@ -399,13 +348,7 @@ export default function NewOrderScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={'padding'}>
         <View style={styles.screenWrap}>
-          {/* Modern Nav Bar */}
-          <View style={styles.headerBar}>
-            <Pressable style={styles.backBtn} onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={22} color={ACCENT} />
-            </Pressable>
-            <Text style={styles.headerTitle}>New Order</Text>
-          </View>
+          <OrdersHeader title="New Order" />
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* CUSTOMER DETAILS */}
             <Text style={styles.sectionLabel}>Customer Details</Text>
@@ -725,7 +668,7 @@ export default function NewOrderScreen() {
                     <View style={styles.orderTotalCard}>
                       <Text style={styles.orderTotalLabel}>Order Total</Text>
                       <Text style={styles.orderTotalValue}>
-                        ₹{orderItems.reduce((sum: number, item: OrderItem) => sum + item.total, 0)}
+                        ₹{orderItems.reduce((sum: number, item: any) => sum + item.total, 0)}
                       </Text>
                     </View>
                   </View>
@@ -818,32 +761,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: androidUI.colors.background,
   },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: androidUI.colors.surface,
-    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
-    paddingBottom: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: androidUI.colors.border,
-    elevation: 4,
-    zIndex: 10,
-    minHeight: 68,
-  },
-  backBtn: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.sm,
-    marginRight: androidUI.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
-  },
   container: {
     paddingVertical: 32,
     paddingHorizontal: androidUI.spacing.lg,
@@ -894,69 +811,6 @@ const styles = StyleSheet.create({
     fontFamily: androidUI.fontFamily.regular,
     minHeight: 44,
   },
-  dropdownWrap: {
-    marginBottom: 18,
-  },
-  dropdownLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#22223b',
-    marginBottom: 8,
-    fontFamily: 'System',
-  },
-  dropdownBox: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  dropdownOption: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  dropdownOptionSelected: {
-    backgroundColor: ACCENT,
-  },
-  dropdownOptionText: {
-    color: '#22223b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  dropdownOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  radioRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  radioBtn: {
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    marginRight: 8,
-  },
-  radioBtnSelected: {
-    backgroundColor: ACCENT,
-  },
-  radioBtnText: {
-    color: '#22223b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  radioBtnTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  placeholderText: {
-    color: '#b0b3b8',
-    fontSize: 14,
-    fontStyle: 'italic',
-  },
   orderSubmitBtn: {
     backgroundColor: ACCENT,
     borderRadius: androidUI.borderRadius.large,
@@ -1003,47 +857,6 @@ orderCancelBtnText: {
     fontSize: 15,
     fontWeight: '500',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  pickerModalSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: androidUI.colors.surface,
-    borderTopLeftRadius: androidUI.borderRadius.xxlarge,
-    borderTopRightRadius: androidUI.borderRadius.xxlarge,
-    paddingVertical: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.xxl,
-    ...androidUI.modalShadow,
-    maxHeight: 320,
-  },
-  pickerOption: {
-    paddingVertical: 14,
-    paddingHorizontal: androidUI.spacing.sm,
-    borderRadius: androidUI.borderRadius.small,
-    marginBottom: 2,
-    backgroundColor: '#f3f6fa',
-  },
-  pickerOptionSelected: {
-    backgroundColor: ACCENT,
-  },
-  pickerOptionText: {
-    color: androidUI.colors.text.primary,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  pickerOptionTextSelected: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 10,
-  },
   segmentedToggleRow: {
     flexDirection: 'row',
     gap: 10,
@@ -1070,65 +883,8 @@ orderCancelBtnText: {
     color: '#fff',
     fontWeight: '700',
   },
-  comingSoonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f3f6fa',
-    borderRadius: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 18,
-    marginBottom: 8,
-  },
-  comingSoonText: {
-    color: '#b0b3b8',
-    fontSize: 14,
-    fontStyle: 'italic',
-    marginLeft: 8,
-  },
   orderSubmitBtnPressed: {
     ...androidUI.buttonPress,
-  },
-  orderItemsTable: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  orderItemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  orderItemsCol: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#22223b',
-    flex: 1,
-  },
-  orderItemsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  orderItemsFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  removeOrderItemBtn: {
-    padding: 5,
   },
   addProductBtn: {
     backgroundColor: ACCENT,
@@ -1139,91 +895,6 @@ orderCancelBtnText: {
     flexDirection: 'row',
     justifyContent: 'center',
     marginBottom: 12,
-  },
-  addProductBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-    marginLeft: 8,
-  },
-  productSearchSheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingVertical: 24,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 12,
-    maxHeight: 400,
-  },
-  productSearchTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: ACCENT,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  productResultRow: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  productResultRowSelected: {
-    backgroundColor: '#f3f6fa',
-  },
-  productResultName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#22223b',
-  },
-  productResultDim: {
-    fontSize: 13,
-    color: '#b0b3b8',
-    marginTop: 2,
-  },
-  createProductBtn: {
-    backgroundColor: ACCENT,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  createProductBtnText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  centeredModalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.18)',
-  },
-  centeredModalWrap: {
-    flex: 1,
-  },
-  centeredModalSheet: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingVertical: 24,
-    paddingHorizontal: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 12,
-    maxHeight: 400,
   },
   orderItemCard: {
     backgroundColor: androidUI.colors.surface,
@@ -1447,40 +1118,5 @@ orderCancelBtnText: {
   },
   dropdownScrollView: {
     maxHeight: 200,
-  },
-  orderItemCheckboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: androidUI.spacing.sm,
-  },
-  orderItemCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#ccc',
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: androidUI.spacing.sm,
-  },
-  orderItemCheckboxSelected: {
-    backgroundColor: ACCENT,
-    borderColor: ACCENT,
-  },
-  orderItemCardUnselected: {
-    opacity: 0.6,
-    backgroundColor: '#f8f9fa',
-  },
-  orderItemNameUnselected: {
-    color: '#999',
-    textDecorationLine: 'line-through',
-  },
-  orderItemMetaUnselected: {
-    color: '#999',
-  },
-  orderItemTotalUnselected: {
-    color: '#999',
   },
 }); 

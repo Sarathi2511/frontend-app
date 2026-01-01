@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Platform, Alert, Image } from "react-native";
 import { useEffect, useState } from "react";
-import { getOrders } from "../utils/api";
+import { getOrders, completeOrder } from "../utils/api";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
+import OrdersHeader from "./components/OrdersHeader";
 
 const ACCENT = "#3D5AFE";
 
@@ -121,27 +122,65 @@ export default function OrderDetailsScreen() {
   const { showToast } = useToast();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [completing, setCompleting] = useState(false);
+
+  const fetchOrder = async () => {
+    if (!id) return;
+    try {
+      const response = await getOrders();
+      const foundOrder = response.data.find((o: any) => o.orderId === id);
+      if (foundOrder) {
+        setOrder(foundOrder);
+      } else {
+        setOrder(null);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Failed to fetch order details");
+      setOrder(null);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (id) {
-      const fetchOrder = async () => {
-        try {
-          const response = await getOrders();
-          const foundOrder = response.data.find((o: any) => o.orderId === id);
-          if (foundOrder) {
-            setOrder(foundOrder);
-          } else {
-            setOrder(null);
-          }
-        } catch (err) {
-          Alert.alert("Error", "Failed to fetch order details");
-          setOrder(null);
-        }
-        setLoading(false);
-      };
       fetchOrder();
     }
   }, [id]);
+
+  const handleCompleteOrder = async () => {
+    if (!order || !id) return;
+    
+    // Show confirmation dialog
+    Alert.alert(
+      "Complete Order",
+      "This will deduct the remaining stock quantities. Are you sure?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Complete",
+          style: "default",
+          onPress: async () => {
+            setCompleting(true);
+            try {
+              await completeOrder(String(id));
+              showToast("Order completed successfully. Remaining stock has been deducted.", "success");
+              // Refresh order data
+              await fetchOrder();
+            } catch (err: any) {
+              console.error('Complete order failed:', err);
+              const errorMessage = err.response?.data?.message || "Failed to complete order";
+              showToast(errorMessage, "error");
+            } finally {
+              setCompleting(false);
+            }
+          }
+        }
+      ]
+    );
+  };
 
   if (loading) return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
@@ -174,13 +213,7 @@ export default function OrderDetailsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
       <View style={styles.screenWrap}>
-        {/* Header Bar */}
-        <View style={styles.headerBar}>
-          <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={ACCENT} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Order Details</Text>
-        </View>
+        <OrdersHeader title="Order Details" />
 
         <ScrollView 
           contentContainerStyle={styles.container}
@@ -197,13 +230,23 @@ export default function OrderDetailsScreen() {
                 <Text style={styles.orderDateText}>{new Date(order.date).toLocaleDateString()}</Text>
               </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-              <Pill
-                icon={order.orderStatus === 'Dispatched' ? '✅' : order.orderStatus === 'Pending' ? '⏳' : order.orderStatus === 'Invoice' ? '🧾' : '📦'}
-                text={order.orderStatus}
-                color={order.orderStatus === 'Dispatched' ? '#43a047' : order.orderStatus === 'Pending' ? '#b8860b' : order.orderStatus === 'Invoice' ? '#388e3c' : '#3D5AFE'}
-                bg={order.orderStatus === 'Dispatched' ? '#e8f5e9' : order.orderStatus === 'Pending' ? '#fff3cd' : order.orderStatus === 'Invoice' ? '#e8f5e9' : '#e3e9f9'}
-              />
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 4 }}>
+              {/* Show "Partially Dispatched" badge for dispatched orders with partial delivery */}
+              {order.orderStatus === 'Dispatched' && order.isPartialDelivery ? (
+                <Pill
+                  icon="⚠️"
+                  text="Partially Dispatched"
+                  color="#e65100"
+                  bg="#fff3e0"
+                />
+              ) : (
+                <Pill
+                  icon={order.orderStatus === 'Dispatched' ? '✅' : order.orderStatus === 'Pending' ? '⏳' : order.orderStatus === 'Invoice' ? '🧾' : '📦'}
+                  text={order.orderStatus}
+                  color={order.orderStatus === 'Dispatched' ? '#43a047' : order.orderStatus === 'Pending' ? '#b8860b' : order.orderStatus === 'Invoice' ? '#388e3c' : '#3D5AFE'}
+                  bg={order.orderStatus === 'Dispatched' ? '#e8f5e9' : order.orderStatus === 'Pending' ? '#fff3cd' : order.orderStatus === 'Invoice' ? '#e8f5e9' : '#e3e9f9'}
+                />
+              )}
               <Pill
                 icon={order.paymentCondition === 'Immediate' ? '💵' : '⏳'}
                 text={order.paymentCondition}
@@ -268,34 +311,91 @@ export default function OrderDetailsScreen() {
             {sectionHeader('📦', 'Order Items')}
             {order.orderItems && order.orderItems.length > 0 ? (
               <View style={styles.orderItemsContainer}>
-                {order.orderItems.map((item: any, idx: number) => (
-                  <View key={item._tempId || item._id || `item-${idx}`} style={styles.orderItemCard}>
-                    <View style={styles.orderItemRow}>
-                      {item.image || item.productImage ? (
-                        <Image source={{ uri: item.image || item.productImage }} style={styles.productThumb} />
-                      ) : (
-                        <View style={styles.productThumbPlaceholder}>
-                          <Ionicons name="cube-outline" size={28} color="#b0b3b8" />
-                        </View>
-                      )}
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.orderItemName} numberOfLines={1}>{item.name}</Text>
-                        <View style={styles.orderItemMetaRow}>
-                          <Text style={styles.orderItemMeta}>Qty: {item.qty} × ₹{item.price}</Text>
-                          <Text style={styles.orderItemTotal}>₹{item.total}</Text>
-                        </View>
-                        {item.dimension && (
-                          <Text style={[styles.orderItemMeta, { marginTop: 2 }]}>{item.dimension}</Text>
+                {order.orderItems.map((item: any, idx: number) => {
+                  const isPartiallyDelivered = item.isDelivered && item.deliveredQty !== null && item.deliveredQty < item.qty;
+                  const isNotDelivered = order.orderStatus === 'Dispatched' && !item.isDelivered;
+                  
+                  return (
+                    <View 
+                      key={item._tempId || item._id || `item-${idx}`} 
+                      style={[
+                        styles.orderItemCard,
+                        isNotDelivered && styles.orderItemCardNotDelivered
+                      ]}
+                    >
+                      <View style={styles.orderItemRow}>
+                        {item.image || item.productImage ? (
+                          <Image source={{ uri: item.image || item.productImage }} style={styles.productThumb} />
+                        ) : (
+                          <View style={styles.productThumbPlaceholder}>
+                            <Ionicons name="cube-outline" size={28} color="#b0b3b8" />
+                          </View>
                         )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.orderItemName, isNotDelivered && styles.orderItemNameNotDelivered]} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          <View style={styles.orderItemMetaRow}>
+                            <Text style={styles.orderItemMeta}>Qty: {item.qty} × ₹{item.price}</Text>
+                            <Text style={styles.orderItemTotal}>₹{item.total}</Text>
+                          </View>
+                          {item.dimension && (
+                            <Text style={[styles.orderItemMeta, { marginTop: 2 }]}>{item.dimension}</Text>
+                          )}
+                          {/* Show delivery status for dispatched orders */}
+                          {order.orderStatus === 'Dispatched' && item.deliveredQty !== null && item.deliveredQty !== undefined && (
+                            <View style={styles.deliveryStatusRow}>
+                              {isNotDelivered ? (
+                                <View style={styles.notDeliveredBadge}>
+                                  <Ionicons name="close-circle" size={12} color="#ff5252" style={{ marginRight: 2 }} />
+                                  <Text style={styles.notDeliveredText}>Not Delivered</Text>
+                                </View>
+                              ) : isPartiallyDelivered ? (
+                                <View style={styles.partialBadge}>
+                                  <Ionicons name="alert-circle" size={12} color="#e65100" style={{ marginRight: 2 }} />
+                                  <Text style={styles.partialBadgeText}>Delivered: {item.deliveredQty}/{item.qty}</Text>
+                                </View>
+                              ) : (
+                                <View style={styles.deliveredBadge}>
+                                  <Ionicons name="checkmark-circle" size={12} color="#43a047" style={{ marginRight: 2 }} />
+                                  <Text style={styles.deliveredBadgeText}>Delivered</Text>
+                                </View>
+                              )}
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ) : (
               <Text style={styles.noItemsText}>No items in this order.</Text>
             )}
           </View>
+
+          {/* Complete Order Button - Show only for partially dispatched orders */}
+          {order.orderStatus === 'Dispatched' && order.isPartialDelivery && (
+            <View style={styles.sectionCard}>
+              <Pressable
+                style={[styles.completeOrderButton, completing && styles.completeOrderButtonDisabled]}
+                onPress={handleCompleteOrder}
+                disabled={completing}
+              >
+                {completing ? (
+                  <>
+                    <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={styles.completeOrderButtonText}>Completing...</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" style={{ marginRight: 8 }} />
+                    <Text style={styles.completeOrderButtonText}>Complete Order</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
         </ScrollView>
         <View style={styles.stickyTotalCard}>
           <Text style={styles.stickyTotalLabel}>Order Total</Text>
@@ -321,32 +421,6 @@ const styles = StyleSheet.create({
   screenWrap: {
     flex: 1,
     backgroundColor: androidUI.colors.background,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: androidUI.colors.surface,
-    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
-    paddingBottom: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: androidUI.colors.border,
-    elevation: 4,
-    zIndex: 10,
-    minHeight: 68,
-  },
-  backBtn: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.sm,
-    marginRight: androidUI.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
   },
   container: {
     paddingTop: 20,
@@ -400,12 +474,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 14,
   },
-  itemsHeader: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#22223b',
-    marginBottom: 12,
-  },
   orderItemsContainer: {
     marginBottom: 20,
   },
@@ -415,6 +483,11 @@ const styles = StyleSheet.create({
     padding: androidUI.spacing.lg,
     marginBottom: androidUI.spacing.md,
     ...androidUI.shadow,
+  },
+  orderItemCardNotDelivered: {
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#ffcdd2',
   },
   orderItemRow: {
     flexDirection: 'row',
@@ -453,13 +526,75 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#22223b',
   },
-  orderItemCardMidRow: {
-    marginBottom: 12,
+  orderItemNameNotDelivered: {
+    color: '#999',
+    textDecorationLine: 'line-through',
   },
-  orderItemMetaGroup: {
+  deliveryStatusRow: {
+    marginTop: 6,
+  },
+  deliveredBadge: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  deliveredBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#43a047',
+  },
+  partialBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3e0',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  partialBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#e65100',
+  },
+  notDeliveredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    alignSelf: 'flex-start',
+  },
+  notDeliveredText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ff5252',
+  },
+  completeOrderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    ...androidUI.cardShadow,
+    shadowColor: ACCENT,
+  },
+  completeOrderButtonDisabled: {
+    opacity: 0.7,
+  },
+  completeOrderButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: androidUI.fontFamily.medium,
   },
   orderItemMeta: {
     fontSize: 14,
@@ -467,36 +602,6 @@ const styles = StyleSheet.create({
   },
   orderItemMetaValue: {
     fontWeight: '600',
-    color: ACCENT,
-  },
-  orderItemCardBotRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    paddingTop: 12,
-    alignItems: 'flex-end',
-  },
-  orderItemsFooterCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  orderItemsFooterTotalLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#22223b',
-  },
-  orderItemsFooterTotalValue: {
-    fontSize: 18,
-    fontWeight: '700',
     color: ACCENT,
   },
   noItemsText: {

@@ -5,6 +5,7 @@ import { getProducts } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useOrder } from "./OrderContext";
 import { androidUI } from "../utils/androidUI";
+import OrdersHeader from "./components/OrdersHeader";
 
 const ACCENT = "#3D5AFE";
 
@@ -138,12 +139,7 @@ export default function OrderItemsScreen() {
      return (
      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
        <View style={styles.screenWrap}>
-         <View style={styles.headerBar}>
-           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-             <Ionicons name="arrow-back" size={22} color={ACCENT} />
-           </Pressable>
-           <Text style={styles.headerTitle}>Add Order Items</Text>
-         </View>
+         <OrdersHeader title="Add Order Items" />
          <ScrollView 
            contentContainerStyle={styles.container}
            keyboardShouldPersistTaps="handled"
@@ -291,33 +287,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: androidUI.colors.background,
   },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: androidUI.colors.surface,
-    paddingTop: Platform.OS === 'ios' ? 48 : androidUI.statusBarHeight + 12,
-    paddingBottom: androidUI.spacing.lg,
-    paddingHorizontal: androidUI.spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: androidUI.colors.border,
-    elevation: 4,
-    zIndex: 10,
-    minHeight: 68,
-  },
-  backBtn: {
-    backgroundColor: androidUI.colors.border,
-    borderRadius: androidUI.borderRadius.large,
-    padding: androidUI.spacing.sm,
-    marginRight: androidUI.spacing.md,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: androidUI.colors.text.primary,
-    letterSpacing: 0.2,
-    fontFamily: androidUI.fontFamily.medium,
-  },
-           container: {
+  container: {
         paddingVertical: 32,
         paddingHorizontal: androidUI.spacing.lg,
         minHeight: 400,
@@ -379,45 +349,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
     fontSize: 15,
-  },
-  orderItemsTable: {
-    backgroundColor: androidUI.colors.surface,
-    borderRadius: androidUI.borderRadius.small,
-    padding: androidUI.spacing.lg,
-    marginBottom: androidUI.spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  orderItemsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  orderItemsCol: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#22223b',
-    flex: 1,
-  },
-  orderItemsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  orderItemsFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   removeOrderItemBtn: {
     padding: 5,
