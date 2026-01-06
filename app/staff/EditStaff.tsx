@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getStaff, updateStaff } from "../utils/api";
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
@@ -98,7 +97,6 @@ export default function EditStaffScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>Edit Staff</Text>
-            <ConnectionStatus />
           </View>
           <ScrollView 
             contentContainerStyle={styles.container} 

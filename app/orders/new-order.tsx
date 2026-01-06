@@ -122,9 +122,12 @@ export default function NewOrderScreen() {
         if (Array.isArray(response.data)) {
           setStaffList(response.data);
           // Set default assignedTo and assignedToId if not already set
-          if (!form.assignedTo && response.data.length > 0) {
-            setForm(f => ({ ...f, assignedTo: response.data[0].name, assignedToId: response.data[0]._id }));
-          }
+          setForm(f => {
+            if (!f.assignedTo && response.data.length > 0) {
+              return { ...f, assignedTo: response.data[0].name, assignedToId: response.data[0]._id };
+            }
+            return f;
+          });
         }
       } catch (err) {
         Alert.alert("Error", "Failed to fetch staff list");
@@ -153,7 +156,9 @@ export default function NewOrderScreen() {
         setCustomerDropdownOpen(false);
       }
     };
-    if (customerNameFocused) fetchSuggestions();
+    if (customerNameFocused) {
+      fetchSuggestions();
+    }
   }, [form.customerName, customerNameFocused]);
 
   // Fetch route suggestions as user types
@@ -175,7 +180,9 @@ export default function NewOrderScreen() {
         setRouteDropdownOpen(false);
       }
     };
-    if (routeFocused) fetchRouteSuggestions();
+    if (routeFocused) {
+      fetchRouteSuggestions();
+    }
   }, [form.orderRoute, routeFocused]);
 
   // Function to handle customer selection and auto-fill details
@@ -279,6 +286,7 @@ export default function NewOrderScreen() {
   // Clear order items when this screen is first opened
   useEffect(() => {
     clearOrderItems();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Add handlers for editing and deleting items

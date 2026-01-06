@@ -27,7 +27,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     // Add unique temporary ID if not present
     const itemWithId = { 
       ...item, 
-      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}` 
+      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).slice(2, 11)}` 
     };
     setOrderItems(items => [...items, itemWithId]);
   }, []);
@@ -40,7 +40,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
     // Add unique temporary IDs to items that don't have them
     const itemsWithIds = items.map(item => ({
       ...item,
-      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      _tempId: item._tempId || `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
     }));
     setOrderItems(itemsWithIds);
   }, []);

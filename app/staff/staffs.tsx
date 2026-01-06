@@ -3,8 +3,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Animated, FlatList, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { deleteStaff, getStaff } from "../utils/api";
-import { useSocket } from "../contexts/SocketContext";
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
@@ -16,7 +14,6 @@ export default function StaffsScreen() {
   const [search, setSearch] = useState("");
   const [expandedStaffId, setExpandedStaffId] = useState<string | null>(null);
   const [animatedHeight] = useState(new Animated.Value(0));
-  const { lastStaffEvent } = useSocket();
 
   const fetchAndSetStaffs = async () => {
     setLoading(true);
@@ -33,13 +30,6 @@ export default function StaffsScreen() {
   useEffect(() => {
     fetchAndSetStaffs();
   }, []);
-
-  // Listen for real-time staff updates
-  useEffect(() => {
-    if (lastStaffEvent) {
-      fetchAndSetStaffs();
-    }
-  }, [lastStaffEvent]);
 
   // Filter staff by search
   const filteredStaffs = staffs.filter(
@@ -114,7 +104,6 @@ export default function StaffsScreen() {
           <Ionicons name="arrow-back" size={22} color={ACCENT} />
         </Pressable>
         <Text style={styles.headerTitle}>Staff</Text>
-        <ConnectionStatus />
       </View>
       {loading ? (
         <View style={styles.loaderWrap}>

@@ -3,7 +3,6 @@ import { useEffect, useState, useCallback } from "react";
 import { FlatList, StyleSheet, Text, View, ActivityIndicator, Pressable, Alert } from "react-native";
 import { getOrders, updateOrder, deleteOrder, getStaff, getDispatchConfirmation, dispatchOrder } from "../utils/api";
 import { useLocalSearchParams } from "expo-router";
-import { useSocket } from "../contexts/SocketContext";
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 import { Animated } from "react-native";
@@ -190,9 +189,6 @@ export default function OrdersScreen() {
     setFilteredOrders(filtered);
   }, [search, statusFilter, orders]);
 
-  // WebSocket event listeners for real-time updates
-  const { socket } = useSocket();
-  
   // Animate dropdown expansion/collapse
   useEffect(() => {
     Animated.timing(animatedHeight, {
@@ -201,77 +197,6 @@ export default function OrdersScreen() {
       useNativeDriver: false,
     }).start();
   }, [expandedOrderId]);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for order creation events
-    const handleOrderCreated = (data: any) => {
-      setOrders(prevOrders => {
-        const newOrder = data.order;
-        const exists = prevOrders.find(order => order._id === newOrder._id);
-        if (exists) return prevOrders;
-        return [newOrder, ...prevOrders];
-      });
-      
-      setOrderCounts(prevCounts => ({
-        ...prevCounts,
-        [data.order.orderStatus]: (prevCounts[data.order.orderStatus] || 0) + 1
-      }));
-    };
-
-    // Listen for order update events
-    const handleOrderUpdated = (data: any) => {
-      setOrders(prevOrders => {
-        const updatedOrders = prevOrders.map(order => 
-          order._id === data.order._id ? data.order : order
-        );
-        
-        const counts = {
-          Pending: 0,
-          DC: 0,
-          Invoice: 0,
-          Dispatched: 0
-        };
-        
-        updatedOrders.forEach((order: any) => {
-          if (counts.hasOwnProperty(order.orderStatus)) {
-            counts[order.orderStatus as keyof typeof counts]++;
-          }
-        });
-        
-        setOrderCounts(counts);
-        return updatedOrders;
-      });
-    };
-
-    // Listen for order deletion events
-    const handleOrderDeleted = (data: any) => {
-      setOrders(prevOrders => {
-        const deletedOrder = prevOrders.find(order => order._id === data.orderId);
-        const updatedOrders = prevOrders.filter(order => order._id !== data.orderId);
-        
-        if (deletedOrder) {
-          setOrderCounts(prevCounts => ({
-            ...prevCounts,
-            [deletedOrder.orderStatus]: Math.max(0, (prevCounts[deletedOrder.orderStatus] || 0) - 1)
-          }));
-        }
-        
-        return updatedOrders;
-      });
-    };
-
-    socket.on('order:created', handleOrderCreated);
-    socket.on('order:updated', handleOrderUpdated);
-    socket.on('order:deleted', handleOrderDeleted);
-
-    return () => {
-      socket.off('order:created', handleOrderCreated);
-      socket.off('order:updated', handleOrderUpdated);
-      socket.off('order:deleted', handleOrderDeleted);
-    };
-  }, [socket]);
 
   const handleMenu = useCallback((order: any) => {
     if (expandedOrderId === order._id) {

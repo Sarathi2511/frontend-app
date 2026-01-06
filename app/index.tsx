@@ -4,9 +4,9 @@ import { Animated, Dimensions, KeyboardAvoidingView, Platform, Pressable, StyleS
 import { login } from "./utils/api";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
-import { useSocket } from "./contexts/SocketContext";
 import { androidUI } from "./utils/androidUI";
 import { useToast } from "./contexts/ToastContext";
+import { usePushNotifications } from "./contexts/PushNotificationContext";
 
 const { width } = Dimensions.get("window");
 const ACCENT = "#3D5AFE";
@@ -21,8 +21,8 @@ export default function LoginScreen() {
   const logoAnim = useState(new Animated.Value(0))[0];
   const buttonAnim = useRef(new Animated.Value(1)).current;
   const checkAuthAnim = useRef(new Animated.Value(0)).current;
-  const { connect } = useSocket();
   const { showToast } = useToast();
+  const { registerToken } = usePushNotifications();
 
   // Check if user is already logged in and auto-redirect if valid token exists
   useEffect(() => {
@@ -42,10 +42,14 @@ export default function LoginScreen() {
           const { success } = await (await import('./utils/api')).validateToken();
           
           if (success && isMounted) {
-            // Token is valid - auto-redirect to dashboard
-            // Establish WebSocket connection
-            await connect();
-            // Navigate to dashboard
+            // Token is valid - register push token and auto-redirect to dashboard
+            try {
+              await registerToken();
+            } catch (error) {
+              // Don't block auto-login if push token registration fails
+              console.warn('Failed to register push token on auto-login:', error);
+            }
+            
             router.replace({ 
               pathname: "./dashboard", 
               params: { role, name: name || 'User' } 
@@ -86,7 +90,7 @@ export default function LoginScreen() {
     return () => {
       isMounted = false;
     };
-  }, [showToast, isLoggingIn, connect, router]);
+  }, [showToast, isLoggingIn, router]);
 
   // Animate auth check spinner
   useEffect(() => {
@@ -140,8 +144,13 @@ export default function LoginScreen() {
         await AsyncStorage.setItem('userName', data.name);
         if (data.userId) await AsyncStorage.setItem('userId', data.userId);
         
-        // Establish WebSocket connection after successful login
-        await connect();
+        // Register push notification token after successful login
+        try {
+          await registerToken();
+        } catch (error) {
+          // Don't block login if push token registration fails
+          console.warn('Failed to register push token:', error);
+        }
         
         // Navigate immediately to dashboard
         router.replace({ pathname: "./dashboard", params: { role: data.role, name: data.name } });

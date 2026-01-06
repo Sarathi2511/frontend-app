@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Modal, FlatList, ActivityIndicator, Alert, Animated, SafeAreaView } from "react-native";
 import { getProducts, updateProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 
 const ACCENT = "#3D5AFE";
@@ -142,7 +141,6 @@ export default function EditProductScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>Edit Product</Text>
-            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}

@@ -111,6 +111,14 @@ export const login = async (phone: string, password: string) => {
 };
 
 export const logout = async () => {
+  // Unregister push token before clearing auth data
+  try {
+    await unregisterPushToken();
+  } catch (error) {
+    // Don't block logout if unregister fails
+    console.warn('Failed to unregister push token on logout:', error);
+  }
+  
   await AsyncStorage.removeItem('token');
   await AsyncStorage.removeItem('userRole');
   await AsyncStorage.removeItem('userId');
@@ -231,6 +239,52 @@ export const validateToken = async () => {
     } else if (error.request) {
       throw new Error('Network error during validation');
     }
+    throw error;
+  }
+};
+
+// Push Notification API
+export const registerPushToken = async (pushToken: string) => {
+  try {
+    const response = await api.post('/notifications/register-token', { pushToken });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error registering push token:', error);
+    throw error;
+  }
+};
+
+export const unregisterPushToken = async () => {
+  try {
+    const response = await api.delete('/notifications/unregister-token');
+    return response.data;
+  } catch (error: any) {
+    console.error('Error unregistering push token:', error);
+    throw error;
+  }
+};
+
+export const getNotificationPreferences = async () => {
+  try {
+    const response = await api.get('/notifications/preferences');
+    return response.data;
+  } catch (error: any) {
+    console.error('Error fetching notification preferences:', error);
+    throw error;
+  }
+};
+
+export const updateNotificationPreferences = async (preferences: {
+  orderNotifications?: boolean;
+  inventoryNotifications?: boolean;
+  staffNotifications?: boolean;
+  systemNotifications?: boolean;
+}) => {
+  try {
+    const response = await api.put('/notifications/preferences', preferences);
+    return response.data;
+  } catch (error: any) {
+    console.error('Error updating notification preferences:', error);
     throw error;
   }
 };

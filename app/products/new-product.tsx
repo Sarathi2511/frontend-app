@@ -4,7 +4,6 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { createProduct, getBrands } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 
@@ -120,7 +119,6 @@ export default function NewProductScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>New Product</Text>
-            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}

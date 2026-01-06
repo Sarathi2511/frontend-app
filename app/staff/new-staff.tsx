@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Animated, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { createStaff } from "../utils/api";
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 import { useToast } from "../contexts/ToastContext";
 
@@ -101,7 +100,6 @@ export default function NewStaffScreen() {
               <Ionicons name="arrow-back" size={22} color={ACCENT} />
             </Pressable>
             <Text style={styles.headerTitle}>New Staff</Text>
-            <ConnectionStatus />
           </View>
           <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
             {/* Form Fields */}

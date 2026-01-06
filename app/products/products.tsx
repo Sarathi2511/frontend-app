@@ -4,9 +4,7 @@ import { FlatList, Platform, Pressable, StyleSheet, Text, View, ActivityIndicato
 import { getProducts, deleteProduct, importProductsCSV } from "../utils/api";
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams } from "expo-router";
-import { useSocket } from "../contexts/SocketContext";
 import { useToast } from "../contexts/ToastContext";
-import ConnectionStatus from "../components/ConnectionStatus";
 import { androidUI } from "../utils/androidUI";
 import * as DocumentPicker from 'expo-document-picker';
 
@@ -22,7 +20,6 @@ export default function ProductsScreen() {
   const [search, setSearch] = useState("");
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
   const [animatedHeight] = useState(new Animated.Value(0));
-  const { lastProductEvent } = useSocket();
   const [importing, setImporting] = useState(false);
   const { showToast } = useToast();
 
@@ -55,13 +52,6 @@ export default function ProductsScreen() {
   useEffect(() => {
     fetchAndSetProducts();
   }, []);
-
-  // Listen for real-time product updates
-  useEffect(() => {
-    if (lastProductEvent) {
-      fetchAndSetProducts();
-    }
-  }, [lastProductEvent]);
 
   const handleMenuToggle = (productId: string) => {
     if (expandedProductId === productId) {
@@ -227,7 +217,6 @@ export default function ProductsScreen() {
           <Ionicons name="arrow-back" size={22} color={ACCENT} />
         </Pressable>
         <Text style={styles.headerTitle}>Products</Text>
-        <ConnectionStatus />
       </View>
       {loading ? (
         <View style={styles.loaderWrap}>
