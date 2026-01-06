@@ -46,9 +46,37 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const listenersCleanupRef = useRef<(() => void) | null>(null);
 
-  // Check permissions and register token on mount
+  // Request permissions on app start (before login)
   useEffect(() => {
     let isMounted = true;
+
+    const requestInitialPermissions = async () => {
+      try {
+        console.log('Requesting notification permissions on app start...');
+        // Request permissions immediately when app starts
+        // This ensures the permission dialog appears early
+        const permissionGranted = await requestNotificationPermissions();
+        if (isMounted) {
+          setHasPermission(permissionGranted);
+          console.log('Initial permission status:', permissionGranted);
+        }
+      } catch (error) {
+        console.error('Error requesting initial notification permissions:', error);
+      }
+    };
+
+    // Request permissions immediately on mount
+    requestInitialPermissions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Register token when user logs in (check periodically)
+  useEffect(() => {
+    let isMounted = true;
+    let checkInterval: NodeJS.Timeout | null = null;
 
     const initializeNotifications = async () => {
       try {
@@ -58,17 +86,29 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
           return; // Don't register if not logged in
         }
 
-        // Request permissions
-        const permissionGranted = await requestNotificationPermissions();
-        if (isMounted) {
-          setHasPermission(permissionGranted);
+        // Check if we already have permission
+        if (!hasPermission) {
+          // Try requesting again if we don't have permission yet
+          const permissionGranted = await requestNotificationPermissions();
+          if (isMounted) {
+            setHasPermission(permissionGranted);
+          }
+          if (!permissionGranted) {
+            console.warn('Cannot register push token: permissions not granted');
+            return;
+          }
         }
 
-        if (permissionGranted) {
-          // Register token with backend
-          const registered = await registerTokenWithBackend();
-          if (isMounted) {
-            setIsRegistered(registered);
+        // Register token with backend
+        console.log('Registering push token with backend...');
+        const registered = await registerTokenWithBackend();
+        if (isMounted) {
+          setIsRegistered(registered);
+          console.log('Push token registration result:', registered);
+          // Stop checking once registered
+          if (registered && checkInterval) {
+            clearInterval(checkInterval);
+            checkInterval = null;
           }
         }
       } catch (error) {
@@ -76,12 +116,23 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
       }
     };
 
+    // Check immediately
     initializeNotifications();
+
+    // Also check periodically (in case user logs in)
+    checkInterval = setInterval(() => {
+      if (isMounted) {
+        initializeNotifications();
+      }
+    }, 3000); // Check every 3 seconds
 
     return () => {
       isMounted = false;
+      if (checkInterval) {
+        clearInterval(checkInterval);
+      }
     };
-  }, []);
+  }, [hasPermission]);
 
   // Setup notification listeners
   useEffect(() => {
