@@ -188,7 +188,7 @@ export default function OrdersScreen() {
     }
     setFilteredOrders(filtered);
   }, [search, statusFilter, orders]);
-
+  
   // Animate dropdown expansion/collapse
   useEffect(() => {
     Animated.timing(animatedHeight, {
