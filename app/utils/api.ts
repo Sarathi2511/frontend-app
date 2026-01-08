@@ -249,7 +249,7 @@ export const registerPushToken = async (pushToken: string) => {
     const response = await api.post('/notifications/register-token', { pushToken });
     return response.data;
   } catch (error: any) {
-    console.error('Error registering push token:', error);
+    console.error('Error registering push token:', error?.response?.data?.message || error?.message || error);
     throw error;
   }
 };
@@ -260,31 +260,6 @@ export const unregisterPushToken = async () => {
     return response.data;
   } catch (error: any) {
     console.error('Error unregistering push token:', error);
-    throw error;
-  }
-};
-
-export const getNotificationPreferences = async () => {
-  try {
-    const response = await api.get('/notifications/preferences');
-    return response.data;
-  } catch (error: any) {
-    console.error('Error fetching notification preferences:', error);
-    throw error;
-  }
-};
-
-export const updateNotificationPreferences = async (preferences: {
-  orderNotifications?: boolean;
-  inventoryNotifications?: boolean;
-  staffNotifications?: boolean;
-  systemNotifications?: boolean;
-}) => {
-  try {
-    const response = await api.put('/notifications/preferences', preferences);
-    return response.data;
-  } catch (error: any) {
-    console.error('Error updating notification preferences:', error);
     throw error;
   }
 };

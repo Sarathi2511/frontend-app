@@ -52,13 +52,9 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
 
     const requestInitialPermissions = async () => {
       try {
-        console.log('Requesting notification permissions on app start...');
-        // Request permissions immediately when app starts
-        // This ensures the permission dialog appears early
         const permissionGranted = await requestNotificationPermissions();
         if (isMounted) {
           setHasPermission(permissionGranted);
-          console.log('Initial permission status:', permissionGranted);
         }
       } catch (error) {
         console.error('Error requesting initial notification permissions:', error);
@@ -76,7 +72,7 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
   // Register token when user logs in (check periodically)
   useEffect(() => {
     let isMounted = true;
-    let checkInterval: NodeJS.Timeout | null = null;
+    let checkInterval: ReturnType<typeof setInterval> | null = null;
 
     const initializeNotifications = async () => {
       try {
@@ -100,11 +96,9 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
         }
 
         // Register token with backend
-        console.log('Registering push token with backend...');
         const registered = await registerTokenWithBackend();
         if (isMounted) {
           setIsRegistered(registered);
-          console.log('Push token registration result:', registered);
           // Stop checking once registered
           if (registered && checkInterval) {
             clearInterval(checkInterval);
