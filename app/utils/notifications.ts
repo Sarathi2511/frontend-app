@@ -1,6 +1,5 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { registerPushToken } from './api';
 
@@ -81,10 +80,11 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 }
 
 /**
- * Get Expo push notification token
+ * Get native FCM push token (for Android) or APNs token (for iOS)
+ * This is required for production builds - Expo tokens only work in Expo Go
  * Returns token string or null if unavailable
  */
-export async function getExpoPushToken(): Promise<string | null> {
+export async function getDevicePushToken(): Promise<string | null> {
   try {
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
@@ -92,27 +92,19 @@ export async function getExpoPushToken(): Promise<string | null> {
       return null;
     }
 
-    // Get project ID from app config (works in both dev and production)
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId || 
-                     Constants.easConfig?.projectId ||
-                     'f2703715-5ab9-4ca7-9c47-8c70ea3fa9a1'; // Fallback
-    
-    if (!projectId || projectId === 'f2703715-5ab9-4ca7-9c47-8c70ea3fa9a1') {
-      console.warn('Using fallback project ID. This may cause issues in production!');
-    }
-
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId,
-    });
+    // Get native device token (FCM for Android, APNs for iOS)
+    const tokenData = await Notifications.getDevicePushTokenAsync();
 
     if (!tokenData || !tokenData.data) {
-      console.error('Failed to get push token: token data is null');
+      console.error('Failed to get device push token: token data is null');
       return null;
     }
+
+    console.log(`Device push token type: ${tokenData.type}`); // 'fcm' for Android, 'apns' for iOS
     
     return tokenData.data;
   } catch (error: any) {
-    console.error('Error getting Expo push token:', error?.message || error);
+    console.error('Error getting device push token:', error?.message || error);
     return null;
   }
 }
@@ -120,10 +112,11 @@ export async function getExpoPushToken(): Promise<string | null> {
 /**
  * Register push token with backend
  * This should be called after successful login
+ * Uses native FCM/APNs tokens for production builds
  */
 export async function registerTokenWithBackend(): Promise<boolean> {
   try {
-    const token = await getExpoPushToken();
+    const token = await getDevicePushToken();
     
     if (!token) {
       console.warn('No push token available to register');

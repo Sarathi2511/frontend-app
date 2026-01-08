@@ -263,3 +263,14 @@ export const unregisterPushToken = async () => {
     throw error;
   }
 };
+
+// Test push notification (for debugging)
+export const testPushNotification = async () => {
+  try {
+    const response = await api.post('/notifications/test');
+    return response.data;
+  } catch (error: any) {
+    console.error('Error sending test notification:', error?.response?.data || error?.message);
+    throw error;
+  }
+};

@@ -3,7 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Dimensions, Platform, Pressable, Animated as RNAnimated, StyleSheet, Text, TouchableWithoutFeedback, View } from "react-native";
-import { getCurrentUserId, getOrdersAssignedTo, logout } from './utils/api';
+import { getCurrentUserId, getOrdersAssignedTo, logout, testPushNotification } from './utils/api';
 import { androidUI } from './utils/androidUI';
 
 const { width } = Dimensions.get("window");
@@ -128,6 +128,24 @@ export default function DashboardScreen() {
       ]
     );
   };
+
+  const handleTestNotification = async () => {
+    try {
+      Alert.alert("Sending...", "Sending test notification...");
+      const result = await testPushNotification();
+      Alert.alert(
+        "Success ✅", 
+        `Test notification sent!\n\nTicket ID: ${result.ticket?.id || 'N/A'}\nStatus: ${result.ticket?.status || 'N/A'}`
+      );
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.message || error?.message || 'Unknown error';
+      const errorDetails = error?.response?.data?.error || '';
+      Alert.alert(
+        "Failed ❌", 
+        `Failed to send test notification.\n\nError: ${errorMsg}\n${errorDetails ? `Details: ${errorDetails}` : ''}`
+      );
+    }
+  };
   
   return (
     <View style={{ flex: 1 }}>
@@ -158,6 +176,15 @@ export default function DashboardScreen() {
               <Text style={styles.userRole}>{userRole}</Text>
             </View>
             <View style={styles.headerActions}>
+              <Pressable 
+                style={({ pressed }) => [
+                  styles.logoutButton,
+                  pressed && { opacity: 0.7 }
+                ]} 
+                onPress={handleTestNotification}
+              >
+                <Ionicons name="notifications-outline" size={24} color={ACCENT} />
+              </Pressable>
               <Pressable 
                 style={({ pressed }) => [
                   styles.logoutButton,
