@@ -1,0 +1,63 @@
+export default {
+  expo: {
+    name: "Sarathi",
+    slug: "frontend",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "frontend",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    ios: {
+      supportsTablet: true
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/images/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      edgeToEdgeEnabled: true,
+      package: "com.mailatarun04.sarathiapp",
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON || "./google-services.json",
+      permissions: [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    web: {
+      bundler: "metro",
+      output: "static",
+      favicon: "./assets/images/favicon.png"
+    },
+    plugins: [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/images/adaptive-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#ffffff"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          icon: "./assets/images/icon.png",
+          color: "#3D5AFE",
+          sounds: []
+        }
+      ]
+    ],
+    experiments: {
+      typedRoutes: true
+    },
+    extra: {
+      router: {},
+      eas: {
+        projectId: "f2703715-5ab9-4ca7-9c47-8c70ea3fa9a1"
+      }
+    }
+  }
+};
+
