@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import {
   requestNotificationPermissions,
-  getExpoPushToken,
+  getDevicePushToken,
   registerTokenWithBackend,
   setupNotificationListeners,
   setBadgeCount,
@@ -73,6 +73,11 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
   useEffect(() => {
     let isMounted = true;
     let checkInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Skip push token registration entirely in development (Expo Go)
+    if (__DEV__) {
+      return;
+    }
 
     const initializeNotifications = async () => {
       try {
@@ -198,6 +203,9 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
 
   // Handle app state changes (foreground/background)
   useEffect(() => {
+    // Skip in development mode
+    if (__DEV__) return;
+
     const subscription = AppState.addEventListener('change', async (nextAppState: AppStateStatus) => {
       // When app comes to foreground, refresh token if needed
       if (
@@ -221,6 +229,11 @@ export const PushNotificationProvider: React.FC<PushNotificationProviderProps> =
   }, [hasPermission]);
 
   const registerToken = async (): Promise<boolean> => {
+    // Skip in development (Expo Go) — native FCM tokens are unavailable
+    if (__DEV__) {
+      return false;
+    }
+
     try {
       const permissionGranted = await requestNotificationPermissions();
       setHasPermission(permissionGranted);

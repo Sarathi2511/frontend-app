@@ -113,6 +113,7 @@ export async function getDevicePushToken(): Promise<string | null> {
  * Register push token with backend
  * This should be called after successful login
  * Uses native FCM/APNs tokens for production builds
+ * Gracefully skips in development (Expo Go) where native FCM tokens are unavailable
  */
 export async function registerTokenWithBackend(): Promise<boolean> {
   try {

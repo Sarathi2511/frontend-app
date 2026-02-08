@@ -14,7 +14,11 @@ export default function ProductsScreen() {
   const router = useRouter();
   const { role } = useLocalSearchParams();
   const userRole = role ? String(role) : "User";
-  const canImport = ['Admin', 'Staff', 'Executive'].includes(userRole);
+  const canCreate = ['Admin', 'Staff', 'Executive'].includes(userRole);
+  const canUpdate = ['Admin', 'Staff', 'Inventory Manager'].includes(userRole);
+  const canDelete = ['Admin', 'Staff'].includes(userRole);
+  const canImport = ['Admin', 'Inventory Manager'].includes(userRole);
+  const hasActions = canUpdate || canDelete; // Whether the card menu has any actions to show
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -37,6 +41,7 @@ export default function ProductsScreen() {
     isComplete: false
   });
 
+
   const fetchAndSetProducts = async () => {
     setLoading(true);
     try {
@@ -53,6 +58,10 @@ export default function ProductsScreen() {
     fetchAndSetProducts();
   }, []);
 
+  // Calculate menu height based on number of visible actions
+  const actionCount = (canUpdate ? 1 : 0) + (canDelete ? 1 : 0);
+  const menuHeight = actionCount * 70; // ~80px per action item
+
   const handleMenuToggle = (productId: string) => {
     if (expandedProductId === productId) {
       // Close the menu
@@ -65,7 +74,7 @@ export default function ProductsScreen() {
       // Open the menu
       setExpandedProductId(productId);
       Animated.timing(animatedHeight, {
-        toValue: 120, // Height for two menu items (Edit and Delete)
+        toValue: menuHeight,
         duration: 200,
         useNativeDriver: false,
       }).start();
@@ -91,7 +100,7 @@ export default function ProductsScreen() {
       duration: 150,
       useNativeDriver: false,
     }).start();
-    if (!product || !['Admin', 'Inventory Manager'].includes(userRole)) return;
+    if (!product || !canDelete) return;
     Alert.alert(
       'Delete Product',
       `Are you sure you want to delete "${product.name}"?`,
@@ -229,6 +238,7 @@ export default function ProductsScreen() {
             <TextInput
               style={styles.searchInput}
               placeholder="Search by Name or Dimension"
+              placeholderTextColor="#555"
               value={search}
               onChangeText={setSearch}
             />
@@ -244,6 +254,20 @@ export default function ProductsScreen() {
                   <Text style={styles.importBtnText}>
                     {importing ? 'Importing...' : 'Import CSV'}
                   </Text>
+                </Pressable>
+              </>
+            )}
+            
+            {/* Download Stock Button - Admin and Inventory Manager only */}
+            {canImport && (
+              <>
+                <View style={{ height: 10 }} />
+                <Pressable
+                  style={styles.downloadBtn}
+                  onPress={() => router.push({ pathname: '/products/download-stock' })}
+                >
+                  <Ionicons name="download-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+                  <Text style={styles.downloadBtnText}>Download Stock</Text>
                 </Pressable>
               </>
             )}
@@ -362,18 +386,20 @@ export default function ProductsScreen() {
                 {/* Top Row: Product Name and Menu Icon */}
                 <View style={styles.cardRowTop}>
                   <Text style={styles.productName}>{item.name}</Text>
-                  <Pressable 
-                    style={[styles.menuIconBtn, expandedProductId === item._id && styles.menuIconBtnActive]} 
-                    onPress={() => handleMenuToggle(item._id)}
-                  >
-                    <Animated.View style={{
-                      transform: [{
-                        rotate: expandedProductId === item._id ? '180deg' : '0deg'
-                      }]
-                    }}>
-                      <Ionicons name="chevron-down" size={20} color={expandedProductId === item._id ? ACCENT : "#b0b3b8"} />
-                    </Animated.View>
-                  </Pressable>
+                  {hasActions && (
+                    <Pressable 
+                      style={[styles.menuIconBtn, expandedProductId === item._id && styles.menuIconBtnActive]} 
+                      onPress={() => handleMenuToggle(item._id)}
+                    >
+                      <Animated.View style={{
+                        transform: [{
+                          rotate: expandedProductId === item._id ? '180deg' : '0deg'
+                        }]
+                      }}>
+                        <Ionicons name="chevron-down" size={20} color={expandedProductId === item._id ? ACCENT : "#b0b3b8"} />
+                      </Animated.View>
+                    </Pressable>
+                  )}
                 </View>
                 {/* Middle Row: Brand, Stock and Dimension */}
                 <View style={styles.cardRowMid}>
@@ -409,15 +435,17 @@ export default function ProductsScreen() {
                 {/* Animated Action Menu */}
                 {expandedProductId === item._id && (
                   <Animated.View style={[styles.actionMenu, { height: animatedHeight }]}>
-                    <Pressable 
-                      style={[styles.actionButton, styles.editButton]} 
-                      onPress={() => handleEditProduct(item)}
-                    >
-                      <Ionicons name="pencil" size={18} color="#3D5AFE" />
-                      <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit Product</Text>
-                    </Pressable>
+                    {canUpdate && (
+                      <Pressable 
+                        style={[styles.actionButton, styles.editButton]} 
+                        onPress={() => handleEditProduct(item)}
+                      >
+                        <Ionicons name="pencil" size={18} color="#3D5AFE" />
+                        <Text style={[styles.actionButtonText, styles.editButtonText]}>Edit Product</Text>
+                      </Pressable>
+                    )}
                     
-                    {['Admin', 'Inventory Manager'].includes(userRole) && (
+                    {canDelete && (
                       <Pressable 
                         style={[styles.actionButton, styles.deleteButton]} 
                         onPress={() => handleDeleteProduct(item)}
@@ -433,9 +461,11 @@ export default function ProductsScreen() {
             ListEmptyComponent={() => (
               <View style={styles.emptyWrap}>
                 <Text style={styles.emptyText}>No Products Yet</Text>
-                <Pressable style={styles.createProductBtn} onPress={() => router.push({ pathname: '/products/new-product', params: { role } })}>
-                  <Text style={styles.createProductBtnText}>Create Product</Text>
-                </Pressable>
+                {canCreate && (
+                  <Pressable style={styles.createProductBtn} onPress={() => router.push({ pathname: '/products/new-product', params: { role } })}>
+                    <Text style={styles.createProductBtnText}>Create Product</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           />
@@ -768,5 +798,22 @@ const styles = StyleSheet.create({
   lowStockIndicator: {
     color: '#ff9800',
     fontSize: 12,
+  },
+  // Download Button Styles
+  downloadBtn: {
+    backgroundColor: '#00C853',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: androidUI.borderRadius.medium,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  downloadBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
 }); 

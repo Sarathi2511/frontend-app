@@ -24,7 +24,7 @@ const modules = [
     icon: "💡",
     color: "#00C853",
     description: "Check and update stock levels.",
-    roles: ["Admin", "Inventory Manager"]
+    roles: ["Admin", "Staff", "Executive", "Inventory Manager"]
   },
   {
     key: "staff",
@@ -204,12 +204,14 @@ export default function DashboardScreen() {
               <Text style={styles.dashboardIcon}>🧭</Text>
               <Text style={styles.dashboardTitle}>Dashboard</Text>
             </View>
-            <Pressable 
-              style={styles.dashboardAddButton}
-              onPress={() => setShowQuickActions(true)}
-            >
-              <Text style={styles.dashboardAddButtonText}>+</Text>
-            </Pressable>
+            {userRole !== 'Inventory Manager' && (
+              <Pressable 
+                style={styles.dashboardAddButton}
+                onPress={() => setShowQuickActions(true)}
+              >
+                <Text style={styles.dashboardAddButtonText}>+</Text>
+              </Pressable>
+            )}
           </View>
           <View style={styles.dashboardDivider} />
         </View>
@@ -324,8 +326,8 @@ export default function DashboardScreen() {
                     <Text style={styles.quickActionLabel}>Orders</Text>
                   </Pressable>
                 )}
-                {/* Products - Available for Admin and Inventory Manager only (not Staff or Executive) */}
-                {(userRole === 'Admin' || userRole === 'Inventory Manager') && (
+                {/* Products - Available for Admin, Staff, and Executive (roles that can create products) */}
+                {['Admin', 'Staff', 'Executive'].includes(userRole) && (
                   <Pressable 
                     style={styles.quickActionButton}
                     onPress={() => handleQuickAction('product')}
